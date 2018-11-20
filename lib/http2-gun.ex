@@ -1,9 +1,13 @@
 defmodule HTTP2Gun do
-  @moduledoc """
-  Da keeps the contexts that define your domain
-  and business logic.
+  alias HTTP2Gun.Request
 
-  Contexts are also responsible for managing your data, regardless
-  if it comes from the database, an external API or others.
-  """
+  def request(pid) do
+    request_test = %Request{
+      method: :post,
+      path: "/",
+      headers: [],
+      body: ""
+      }
+    GenServer.call(pid, request_test)
+  end
 end

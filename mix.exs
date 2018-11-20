@@ -1,4 +1,4 @@
-defmodule Da.Mixfile do
+defmodule HTTP2Gun.Mixfile do
   use Mix.Project
 
   def project do
@@ -32,7 +32,8 @@ defmodule Da.Mixfile do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:gun, "~>1.3.0"}
+      {:gun, "~>1.3.0"},
+      {:poolboy, ">=0.0.0"}
     ]
   end
 end

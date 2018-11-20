@@ -1,0 +1,12 @@
+{application,http2_gun,
+             [{applications,[kernel,stdlib,elixir,logger,runtime_tools,
+                             poolboy,gun]},
+              {description,"http2_gun"},
+              {modules,['Elixir.HTTP2Gun','Elixir.HTTP2Gun.Application',
+                        'Elixir.HTTP2Gun.ConnectionWorker',
+                        'Elixir.HTTP2Gun.ConnectionWorker.Error',
+                        'Elixir.HTTP2Gun.ConnectionWorker.Response',
+                        'Elixir.HTTP2Gun.PoolConn','Elixir.HTTP2Gun.Request']},
+              {registered,[]},
+              {vsn,"0.0.1"},
+              {mod,{'Elixir.HTTP2Gun.Application',[]}}]}.

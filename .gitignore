@@ -4,4 +4,4 @@
 *.iml
 /doc
 /examples
-/.elixir_ls
+/.elixir_ls/

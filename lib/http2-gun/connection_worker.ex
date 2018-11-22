@@ -35,7 +35,7 @@ defmodule HTTP2Gun.ConnectionWorker do
   end
 
   def init(state) do
-    {:ok, pid} = :gun.open(String.to_charlist(state.host), state.port)
+    {:ok, pid} = :gun.open(String.to_charlist(state.host), state.port, %{retry: 0, retry_timeout: 0})
 
     {:ok, %Worker{gun_pid: pid, host: state.host, port: state.port, opts: state.opts}}
   end
@@ -68,6 +68,11 @@ defmodule HTTP2Gun.ConnectionWorker do
     {:noreply, state_new}
   end
 
+  def handle_info({:gun_error, _, _, _}, state) do
+    IO.puts("WORKER")
+    {:noreply, state}
+  end
+
   # def handle_info(msg, state) do
   #   msg |> IO.inspect
   #   {:noreply, state}
@@ -76,7 +81,23 @@ defmodule HTTP2Gun.ConnectionWorker do
   def handle_call({%Request{method: method, path: path}, cancel_ref}, from,
                     %Worker{streams: streams, cancels: cancels}=state) do
     IO.puts("---------> Connection worker REQUEST")
+    stream_ref = :gun.request(state.gun_pid, String.to_charlist(method), String.to_charlist(path), [])
 
+    {:noreply, %{state |
+      streams: (
+        streams |> Map.put(stream_ref, {from, %Response{}, cancel_ref})
+        ),
+      cancels: (
+        cancels |> Map.put(cancel_ref, stream_ref)
+        )
+      }
+    }
+  end
+
+
+  def handle_cast({%Request{method: method, path: path}, cancel_ref, from},
+                    %Worker{streams: streams, cancels: cancels}=state) do
+    IO.puts("---------> Connection worker REQUEST")
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method), String.to_charlist(path), [])
 
     {:noreply, %{state |
@@ -102,6 +123,8 @@ defmodule HTTP2Gun.ConnectionWorker do
           cancels |> Map.delete(cancel_ref)
         )
       }
+    else
+      state
     end
   end
 
@@ -113,4 +136,9 @@ defmodule HTTP2Gun.ConnectionWorker do
       )
     }
   end
+
+  # def terminate(reason, state) do
+  #   IO.puts("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+  #   state |> IO.inspect
+  # end
 end

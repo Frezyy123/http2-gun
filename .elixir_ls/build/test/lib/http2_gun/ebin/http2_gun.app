@@ -1,6 +1,6 @@
 {application,http2_gun,
              [{applications,[kernel,stdlib,elixir,logger,runtime_tools,
-                             poolboy,gun]},
+                             logger_file_backend,poolboy,gun]},
               {description,"http2_gun"},
               {modules,['Elixir.HTTP2Gun','Elixir.HTTP2Gun.Application',
                         'Elixir.HTTP2Gun.ConnectionWorker',

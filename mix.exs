@@ -33,7 +33,9 @@ defmodule HTTP2Gun.Mixfile do
   defp deps do
     [
       {:gun, "~>1.3.0"},
-      {:poolboy, ">=0.0.0"}
+      {:poolboy, ">=0.0.0"},
+      {:logger_file_backend, ">=0.0.0"}
+
     ]
   end
 end

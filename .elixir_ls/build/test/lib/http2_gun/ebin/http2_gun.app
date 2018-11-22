@@ -3,11 +3,11 @@
                              poolboy,gun]},
               {description,"http2_gun"},
               {modules,['Elixir.HTTP2Gun','Elixir.HTTP2Gun.Application',
-                        'Elixir.HTTP2Gun.Connection',
                         'Elixir.HTTP2Gun.ConnectionWorker',
                         'Elixir.HTTP2Gun.ConnectionWorker.Error',
                         'Elixir.HTTP2Gun.ConnectionWorker.Response',
-                        'Elixir.HTTP2Gun.PoolConn','Elixir.HTTP2Gun.Request']},
+                        'Elixir.HTTP2Gun.PoolConn','Elixir.HTTP2Gun.Registry',
+                        'Elixir.HTTP2Gun.Request']},
               {registered,[]},
               {vsn,"0.0.1"},
               {mod,{'Elixir.HTTP2Gun.Application',[]}}]}.

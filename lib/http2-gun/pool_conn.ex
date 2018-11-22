@@ -2,69 +2,86 @@ defmodule HTTP2Gun.PoolConn do
   use GenServer
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
-  alias HTTP2Gun.Connection, as: Connection
 
   @max_requests 150
-  # conn - existing connections
-  # conn: %{pid:{free: , state: (up or down)} }
+
   defstruct [
-    conn: []
+    conn: %{}
   ]
   def start_link() do
     {:ok, pid} = GenServer.start_link(__MODULE__, [])
     {:ok, pid}
   end
 
-  def init(args) do
-    {:ok, %__MODULE__{conn: []}}
+  def init(_) do
+    {:ok, %__MODULE__{conn: %{}}}
   end
 
   # def handle_info(msg, state) do
   #   {:noreply, state}
   # end
 
-  def handle_info({pid, :decrement}, state) do
+  defp via_tuple(name) do
+    {:via, HTTP2Gun.Registry, {:conn_name, name}}
+  end
 
-    IO.puts("-------> Handle info DECREMENT")
-    state |> IO.inspect
-    conn = Enum.find(state.conn, fn x -> x.pid == pid end)
-    next_conn = %{conn | count_requests: conn.count_requests - 1}
-    {:noreply, %{state | conn: next_conn}} |> IO.inspect
+  def handle_info({pid, :decrement}, state) do
+    IO.puts("---> Handle info DECREMENT")
+    next_conn = %{state | conn: state.conn |> Map.update!(pid, fn {x, name} -> {x - 1, name} end)}
+    {:noreply, next_conn} |> IO.inspect
   end
 
   def handle_call(request, from, state) do
-    IO.puts("-------> Handle call POOL")
-    state |> IO.inspect
-    new_pid = if(Enum.empty?(state.conn)) do
-      {:ok, conn_pid} = Worker.start_link(%{host: "example.com", port: 443, opts: []})
-      conn_pid
-    else
-      min_conn = Enum.min_by(state.conn, fn x -> x.count_requests end)
-      cond do
-        min_conn.count_requests < @max_requests ->
-          conn_pid = min_conn.pid
-        true ->
-          {:ok, conn_pid} = Worker.start_link(%{host: "example.com", port: 443, opts: []})
-          conn_pid
+    IO.puts("---> Handle call POOL")
+    {new_pid, new_state} =
+      if(Enum.empty?(state.conn)) do
+        IO.puts("------> State is EMPTY")
+        name = 1
+        {:ok, conn_pid} = Worker.start_link(
+                            %{host: "example.com", port: 443, opts: []},
+                            via_tuple(name))
+        new_state =  %{state | conn: state.conn
+                        |> Map.put(conn_pid, {1, name})}
+        {conn_pid, new_state}
+      else
+        {min_key, {min_value, _}} = Enum.to_list(state.conn)
+                                    |> Enum.min_by(fn {_, {value, _}} -> value end)
+        cond do
+          min_value < @max_requests ->
+            IO.puts("------> Even less than MAX_REQUESTS")
+            new_state =  %{state | conn: state.conn
+                            |> Map.update!(min_key, fn {x, name} -> {x + 1, name} end)}
+            {min_key, new_state}
+          true ->
+            IO.puts("------> Start new CONNECTION")
+            {_, {_, last_name}} = Enum.to_list(state.conn)
+                                  |> Enum.max_by(fn {_, {_, name}} -> name end)
+            {:ok, conn_pid} = Worker.start_link(
+                                %{host: "example.com", port: 443, opts: []},
+                                via_tuple(last_name + 1 ))
+            new_state = %{state | conn: state.conn
+                            |> Map.put(conn_pid, {1, last_name + 1})}
+            {conn_pid, new_state}
+        end
       end
-    end
     cancel_ref = :erlang.make_ref()
 
-    current_connection = case(Enum.empty?(state.conn)) do
-      true ->   %{state | conn: [state.conn ++ %Connection{pid: new_pid, count_requests: 1}]}
-      _ ->
-            conn = Enum.find(state.conn, fn x -> x.pid == new_pid end)
-                  number = conn.count_requests + 1
-            %{conn | count_requests: number}
-    end |> IO.inspect
 
-    response = spawn(GenServer, :call, [new_pid,  {request, cancel_ref}])
+    # current_connection = case(Enum.empty?(state.conn)) do
+    #   true ->
+    #         %{state | conn: state.conn |> Map.put(new_pid, 1)}
+    #   _ ->
+    #         %{state | conn: state.conn |> Map.update!(new_pid, fn x -> x + 1 end)}
+    # end
 
-    send(self(), {new_pid, :decrement})
+    # response = spawn(GenServer, :call, [new_pid,  {request, cancel_ref}])
+    response = spawn_link(GenServer, :call, [new_pid,  {request, cancel_ref}])
+    send(self(), {new_pid, :decrement}) |> IO.inspect
+    self() |> IO.inspect
 
     GenServer.reply(from, response)
 
     # GenServer.call(pid,  {request, cancel_ref})
-    {:noreply,  current_connection} |> IO.inspect
+    {:noreply,  new_state} |> IO.inspect
   end
 end

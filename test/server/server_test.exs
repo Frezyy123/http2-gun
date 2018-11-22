@@ -9,9 +9,11 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "simple request", %{pid: pid} do
-    HTTP2Gun.request(pid)
-    HTTP2Gun.request(pid)
-    HTTP2Gun.request(pid)
+    pids = Enum.map(1..360, fn x -> pid end) |> IO.inspect
+    pids
+      |> Enum.map( &(Task.async(fn  -> HTTP2Gun.request(&1) end)))
+      |> Enum.map(&(Task.await(&1)))
+      |> IO.inspect
   end
 
 end

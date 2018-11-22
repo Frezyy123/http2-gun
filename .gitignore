@@ -1,9 +1,7 @@
 /_build
-/cover
 /deps
+.idea/*
+*.iml
 /doc
-/.fetch
-erl_crash.dump
-*.ez
-*.beam
-/config/*.secret.exs
+/examples
+/.elixir_ls

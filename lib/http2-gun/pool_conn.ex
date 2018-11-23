@@ -4,7 +4,7 @@ defmodule HTTP2Gun.PoolConn do
   alias HTTP2Gun.ConnectionWorker, as: Worker
 
   @max_requests 100
-  @count 8
+  @count 1
   defstruct [
     conn: %{}
   ]
@@ -30,6 +30,11 @@ defmodule HTTP2Gun.PoolConn do
     {:noreply, next_conn} |> IO.inspect
   end
 
+  def handle_call({:test}, from, state) do
+
+    {:reply, state, state}
+  end
+
   def handle_info(msg, state) do
     IO.puts("POOL")
     msg |> IO.inspect
@@ -49,7 +54,7 @@ defmodule HTTP2Gun.PoolConn do
     %{state | conn: conn_map}
   end
 
-  def handle_call(request, from, state) do
+  def handle_call({request, pid}, from, state) do
     IO.puts("---> Handle call POOL")
 
 
@@ -68,6 +73,7 @@ defmodule HTTP2Gun.PoolConn do
           {min_key, new_state}
         true ->
           IO.puts("------> Start new CONNECTION")
+          GenServer.cast(pid, {self(), Enum.count(state.conn)})
           {_, {_, last_name}} = Enum.to_list(state.conn)
                                 |> Enum.max_by(fn {_, {_, name}} -> name end)
           {:ok, conn_pid} = Worker.start_link(
@@ -84,7 +90,6 @@ defmodule HTTP2Gun.PoolConn do
     spawn_link(fn ->
       response = GenServer.call(new_pid,  {request, cancel_ref})
       send(pid, {new_pid, :decrement})
-      # Process.sleep(1000)
       GenServer.reply(from, response)
     end)
 

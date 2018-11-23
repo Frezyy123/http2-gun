@@ -3,6 +3,7 @@ defmodule HTTP2Gun do
 
   def request(pid) do
     request_test = %Request{
+      host: "example.org",
       method: "GET",
       path: "/",
       headers: [],

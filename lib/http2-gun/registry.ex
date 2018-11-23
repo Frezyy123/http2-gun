@@ -9,6 +9,7 @@ defmodule HTTP2Gun.Registry do
     GenServer.call(:registry, {:whereis_name, conn_name})
   end
 
+
   def register_name(conn_name, pid) do
     GenServer.call(:registry, {:register_name, conn_name, pid})
   end

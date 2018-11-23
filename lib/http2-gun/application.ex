@@ -8,6 +8,7 @@ defmodule HTTP2Gun.Application do
           id: Registry,
           start: {HTTP2Gun.Registry, :start_link, []}
         }
+
         # %{
         #   id: GenServerProcess,
         #   start: {HTTP2Gun.PoolConn, :start_link, []}

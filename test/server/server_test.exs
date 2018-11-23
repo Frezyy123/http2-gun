@@ -4,7 +4,7 @@ defmodule HTTP2Gun.ServerTest do
   alias HTTP2Gun.ConnectionWorker.Request
   setup do
 
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolConn, [{count, 4}])
+    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolConn, [])
     {:ok, %{pid: pid}}
   end
 

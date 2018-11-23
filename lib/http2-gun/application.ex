@@ -5,13 +5,14 @@ defmodule HTTP2Gun.Application do
   def start(_type, _args) do
       children = [
         %{
-          id: GenServerProcess,
-          start: {HTTP2Gun.PoolConn, :start_link, []}
-        },
-        %{
           id: Registry,
           start: {HTTP2Gun.Registry, :start_link, []}
         }
+        # %{
+        #   id: GenServerProcess,
+        #   start: {HTTP2Gun.PoolConn, :start_link, []}
+        # }
+
       ]
     Supervisor.start_link(children, strategy: :one_for_one)
   end

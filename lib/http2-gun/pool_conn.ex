@@ -4,18 +4,18 @@ defmodule HTTP2Gun.PoolConn do
   alias HTTP2Gun.ConnectionWorker, as: Worker
 
   @max_requests 100
-
+  @count 8
   defstruct [
     conn: %{}
   ]
 
-  def start_link(opts) do
-    {:ok, pid} = GenServer.start_link(__MODULE__, opts)
+  def start_link() do
+    {:ok, pid} = GenServer.start_link(__MODULE__, [])
     {:ok, pid}
   end
 
-  def init(opts) do
-    state = open_conn(%__MODULE__{conn: %{}}, opts.count)
+  def init(_) do
+    state = open_conn(%__MODULE__{conn: %{}}, @count) |> IO.inspect
     {:ok, state}
   end
 
@@ -42,21 +42,29 @@ defmodule HTTP2Gun.PoolConn do
                             via_tuple(name))
                             {conn_pid, name}
                             end)
-    new_state = Enum.each(pid_list, fn {conn_pid, name} -> Map.put(state.conn, conn_pid, {0, name}) end)
+    conn_map = Enum.map(pid_list, fn {conn_pid, name} ->{conn_pid, name} end) |>
+    Enum.reduce(%{}, fn {pid,name},acc -> Map.merge(acc, Map.put(%{}, pid, {0,name})) end) |> IO.inspect
 
-    %{state | conn: new_state}
+
+    %{state | conn: conn_map}
   end
 
   def handle_call(request, from, state) do
     IO.puts("---> Handle call POOL")
-    {new_pid, new_state} =
-      {min_key, {min_value, _}} = Enum.to_list(state.conn)
-                                  |> Enum.min_by(fn {_, {value, _}} -> value end)
+
+
+
+    {new_pid, new_state} = if Enum.empty?(state.conn) do
+
+    else {min_key, {min_value, _}} = Enum.to_list(state.conn)
+                                  |> IO.inspect |> Enum.min_by(fn {_, {value, _}} -> value end)
       cond do
         min_value < @max_requests ->
           IO.puts("------> Even less than MAX_REQUESTS")
+          {_, {_, last_name}} = Enum.to_list(state.conn)
+          |> Enum.max_by(fn {_, {_, name}} -> name end)
           new_state =  %{state | conn: state.conn
-                          |> Map.update!(min_key, fn {x, name} -> {x + 1, name} end)}
+                          |> Map.update!(min_key, fn {x, last_name} -> {x + 1, last_name} end)}
           {min_key, new_state}
         true ->
           IO.puts("------> Start new CONNECTION")
@@ -69,6 +77,7 @@ defmodule HTTP2Gun.PoolConn do
                           |> Map.put(conn_pid, {1, last_name + 1})}
           {conn_pid, new_state}
       end
+    end
     cancel_ref = :erlang.make_ref()
 
     pid = self()

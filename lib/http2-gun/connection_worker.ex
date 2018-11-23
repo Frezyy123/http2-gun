@@ -24,23 +24,21 @@ defmodule HTTP2Gun.ConnectionWorker do
     cancels: %{}
   ]
 
-  defmodule Error do
-    defexception reason: nil
-    def message(%__MODULE__{reason: reason}), do: inspect(reason)
-  end
-
-  def start_link(state, name) do
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state, name: name)
+  def start_link(state, _name) do
+    {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state
+                                      )
     {:ok, pid}
   end
 
   def init(state) do
-    {:ok, pid} = :gun.open(String.to_charlist(state.host), state.port, %{retry: 0, retry_timeout: 0})
-
-    {:ok, %Worker{gun_pid: pid, host: state.host, port: state.port, opts: state.opts}}
+    {:ok, pid} = :gun.open(String.to_charlist(state.host), state.port,
+                           %{retry: 0, retry_timeout: 0})
+    {:ok, %Worker{gun_pid: pid, host: state.host,
+                  port: state.port, opts: state.opts}}
   end
 
   def handle_info({:gun_up, conn_pid, protocol}, state) do
+    IO.puts("-------> Gun UP")
     {:gun_up, conn_pid, protocol} |> IO.inspect
     {:noreply, state}
   end
@@ -48,23 +46,25 @@ defmodule HTTP2Gun.ConnectionWorker do
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
     {:gun_data, conn_pid} |> IO.inspect
-    {from, response, cancel_ref} = Map.get(state.streams, stream_ref)
-    response = %Response{response |
-      body: data
-      }
-    state_new = reply(stream_ref, is_fin, from, response, cancel_ref, state)
+    {from, response, cancel_ref, timer_ref} = Map.get(state.streams, stream_ref)
+    response = %Response{response | body: data}
+    state_new = reply(stream_ref, is_fin,
+                      from, response,
+                      cancel_ref, timer_ref,
+                      state)
     {:noreply, state_new}
   end
 
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
     IO.puts("-------> Gun RESPONSE")
     {:gun_response, conn_pid, stream_ref} |> IO.inspect
-    {from, response, cancel_ref} = Map.get(state.streams, stream_ref)
-    response = %Response{response |
-      headers: headers,
-      status_code: status
-      }
-    state_new = continue(stream_ref, is_fin, from, response, cancel_ref, state)
+    {from, response, cancel_ref, timer_ref} = Map.get(state.streams, stream_ref)
+    response = %Response{response | headers: headers,
+                         status_code: status}
+    state_new = continue(stream_ref, is_fin,
+                         from, response,
+                         cancel_ref, timer_ref,
+                         state)
     {:noreply, state_new}
   end
 
@@ -72,6 +72,11 @@ defmodule HTTP2Gun.ConnectionWorker do
     IO.puts("WORKER")
     {:noreply, state}
   end
+
+  # def handle_info(:timeout, state) do
+  #   IO.puts("TIMEOUT")
+  #   {:noreply, state}
+  # end
 
   # def handle_info(msg, state) do
   #   msg |> IO.inspect
@@ -81,11 +86,14 @@ defmodule HTTP2Gun.ConnectionWorker do
   def handle_call({%Request{method: method, path: path}, cancel_ref}, from,
                     %Worker{streams: streams, cancels: cancels}=state) do
     IO.puts("---------> Connection worker REQUEST")
-    stream_ref = :gun.request(state.gun_pid, String.to_charlist(method), String.to_charlist(path), [])
 
+    timer_ref = Process.send_after(self(), :timeout, 2000)
+    stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
+                              String.to_charlist(path), [])
     {:noreply, %{state |
       streams: (
-        streams |> Map.put(stream_ref, {from, %Response{}, cancel_ref})
+        streams |> Map.put(stream_ref, {from, %Response{},
+                                        cancel_ref, timer_ref})
         ),
       cancels: (
         cancels |> Map.put(cancel_ref, stream_ref)
@@ -94,26 +102,12 @@ defmodule HTTP2Gun.ConnectionWorker do
     }
   end
 
-
-  def handle_cast({%Request{method: method, path: path}, cancel_ref, from},
-                    %Worker{streams: streams, cancels: cancels}=state) do
-    IO.puts("---------> Connection worker REQUEST")
-    stream_ref = :gun.request(state.gun_pid, String.to_charlist(method), String.to_charlist(path), [])
-
-    {:noreply, %{state |
-      streams: (
-        streams |> Map.put(stream_ref, {from, %Response{}, cancel_ref})
-        ),
-      cancels: (
-        cancels |> Map.put(cancel_ref, stream_ref)
-        )
-      }
-    }
-  end
-
-  defp reply(stream_ref, is_fin, from, response, cancel_ref,
+  defp reply(stream_ref, is_fin, from, response, cancel_ref, timer_ref,
               %Worker{streams: streams, cancels: cancels}=state) do
     if is_fin == :fin do
+      IO.puts("QUEUE")
+      Process.info(self())[:message_queue_len] |> IO.inspect
+      Process.cancel_timer(timer_ref)
       :ok = GenServer.reply(from, {:ok, response})
       %{state |
         streams: (
@@ -128,17 +122,13 @@ defmodule HTTP2Gun.ConnectionWorker do
     end
   end
 
-  defp continue(stream_ref, _is_fin, from, response, cancel_ref,
+  defp continue(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
                 %Worker{streams: streams}=state) do
     %{state |
       streams: (
-        streams |> Map.put(stream_ref, {from, response, cancel_ref})
+        streams |> Map.put(stream_ref, {from, response,
+                                        cancel_ref, timer_ref})
       )
     }
   end
-
-  # def terminate(reason, state) do
-  #   IO.puts("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-  #   state |> IO.inspect
-  # end
 end

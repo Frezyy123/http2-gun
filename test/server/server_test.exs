@@ -9,15 +9,18 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "simple request", %{pid: pid} do
-    pids = Enum.map(1..101, fn x -> pid end)
+    pids = Enum.map(1..2, fn x -> pid end)
 
     Enum.map(1..1, fn x ->
-    pids
-      |> Enum.map( &(Task.async(fn  -> HTTP2Gun.request(&1) end)))
-      |> Enum.map(&(Task.await(&1)))
-       end)
-  end
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
 
+    Enum.map(1..1, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_new(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
+  end
 
   # test "pool_conn", %{pid: pid} do
   #   state = GenServer.call(pid, {:test})
@@ -27,6 +30,5 @@ defmodule HTTP2Gun.ServerTest do
   #   request = %Request{method: "POST", path: "/", headers: [], body: %{}, opts: []}
   #   assert 1 == GenServer.call(pid, request)
   # end
-
 
 end

@@ -11,4 +11,15 @@ defmodule HTTP2Gun do
       }
     GenServer.call(pid, request_test)
   end
+
+  def request_new(pid) do
+    request_test = %Request{
+      host: "example.com",
+      method: "GET",
+      path: "/",
+      headers: [],
+      body: ""
+      }
+    GenServer.call(pid, request_test)
+  end
 end

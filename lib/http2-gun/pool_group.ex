@@ -23,35 +23,40 @@ defmodule HTTP2Gun.PoolGroup do
     {:ok, %{%PoolGroup{} | pools: init_map}}
   end
 
-  def create_pool(hostname) do
+  def create_pool(hostname, state) do
     # registry
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolConn, via_tuple(hostname), [])
-    pid
+    {:ok, pid} = HTTP2Gun.PoolConn.start_link()
+    update_map = Map.put(state.pools, hostname,
+    {hostname, pid, 0})
+    {%{state | pools: update_map}, pid}
   end
 
   def handle_call(request, from, state) do
     hostname = request.host
-    pool_pid =
-      case Map.fetch(state.pools, hostname) do
+    IO.puts("$$$$$$$$$$$$$$$$")
+    {new_state, pool_pid} =
+      case Map.fetch(state.pools, hostname) |> IO.inspect do
         {:ok, {_,pid,_}} ->
-          pid
-          :error -> create_pool(hostname)
-      end
+          {state, pid}
+          :error -> create_pool(hostname, state)
+        end
     pid = self()
     spawn_link(fn ->
       response = GenServer.call(pool_pid, {request, pid})
       GenServer.reply(from, response) end)
-    {:noreply, state}
+    {:noreply, new_state}
   end
 
   def handle_cast({pool_pid, conns_count}, state) do
+    IO.puts("@@@@@@@@@@@@@@2")
+    {pool_pid, conns_count, state.pools} |> IO.inspect
     map = Enum.map(state.pools,
       fn {name, {hostname, pid, _}} ->
         if (pid == pool_pid) do
           {name, {hostname, pid,
                   conns_count + 1}}
         end
-      end)
+      end) |>IO.inspect
     |> Enum.into(%{})
     IO.puts("*********************************************************************************************************")
     {:noreply, %{state | pools: map}} |> IO.inspect

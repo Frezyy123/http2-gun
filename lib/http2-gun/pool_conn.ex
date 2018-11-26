@@ -3,7 +3,7 @@ defmodule HTTP2Gun.PoolConn do
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
 
-  @max_requests 100
+  @max_requests 5
   @count 1
   defstruct [
     conn: %{}
@@ -78,6 +78,7 @@ defmodule HTTP2Gun.PoolConn do
           {min_key, new_state}
         true ->
           IO.puts("------> Start new CONNECTION")
+          {state.conn, Enum.count(state.conn)} |> IO.inspect
           GenServer.cast(pid, {self(),
                          Enum.count(state.conn)})
           {_, {_, last_name}} = Enum.to_list(state.conn)

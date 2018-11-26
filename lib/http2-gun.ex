@@ -5,6 +5,7 @@ defmodule HTTP2Gun do
     request_test = %Request{
       host: "example.org",
       method: "GET",
+      port: 443,
       path: "/",
       headers: [],
       body: ""
@@ -16,6 +17,7 @@ defmodule HTTP2Gun do
     request_test = %Request{
       host: "example.com",
       method: "GET",
+      port: 443,
       path: "/",
       headers: [],
       body: ""

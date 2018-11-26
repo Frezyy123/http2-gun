@@ -1,9 +1,9 @@
 defmodule HTTP2Gun.PoolGroup do
   use GenServer
   alias HTTP2Gun.PoolGroup
-  # hostname: {name, pid, conns}
-  @default_hostname "example.org"
+
   defstruct [
+    :default_hostname,
     pools: %{}
   ]
   def start_link() do
@@ -11,16 +11,13 @@ defmodule HTTP2Gun.PoolGroup do
     {:ok, pid}
   end
 
-  defp via_tuple(name) do
-    {:via, HTTP2Gun.Registry, {:pool_name, name}}
-  end
-
   def init(_) do
     # default poolgroup
+    default_hostname = Application.get_env(:http2_gun, :default_hostname)
     {:ok, pid} = HTTP2Gun.PoolConn.start_link()
-    init_map = Map.put(%{}, @default_hostname,
-                      {@default_hostname, pid, 0})
-    {:ok, %{%PoolGroup{} | pools: init_map}}
+    init_map = Map.put(%{}, default_hostname,
+                      {default_hostname, pid, 0})
+    {:ok, %{%PoolGroup{} | pools: init_map, default_hostname: default_hostname}}
   end
 
   def create_pool(hostname, state) do
@@ -33,10 +30,9 @@ defmodule HTTP2Gun.PoolGroup do
 
   def handle_call(request, from, state) do
     hostname = request.host
-    IO.puts("$$$$$$$$$$$$$$$$")
     {new_state, pool_pid} =
-      case Map.fetch(state.pools, hostname) |> IO.inspect do
-        {:ok, {_,pid,_}} ->
+      case Map.fetch(state.pools, hostname) do
+        {:ok, {_, pid, _}} ->
           {state, pid}
           :error -> create_pool(hostname, state)
         end
@@ -47,18 +43,10 @@ defmodule HTTP2Gun.PoolGroup do
     {:noreply, new_state}
   end
 
-  def handle_cast({pool_pid, conns_count}, state) do
-    IO.puts("@@@@@@@@@@@@@@2")
-    {pool_pid, conns_count, state.pools} |> IO.inspect
-    map = Enum.map(state.pools,
-      fn {name, {hostname, pid, _}} ->
-        if (pid == pool_pid) do
-          {name, {hostname, pid,
-                  conns_count + 1}}
-        end
-      end) |>IO.inspect
-    |> Enum.into(%{})
-    IO.puts("*********************************************************************************************************")
-    {:noreply, %{state | pools: map}} |> IO.inspect
+  def handle_cast({pool_pid, conns_count, hostname}, state) do
+    update_map = Map.update!(state.pools, hostname,
+                             fn {_host, _pid, _count} ->
+                               {hostname, pool_pid, conns_count + 1} end)
+    {:noreply, %{state | pools: update_map}} |> IO.inspect
   end
 end

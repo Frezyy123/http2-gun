@@ -3,9 +3,9 @@ defmodule HTTP2Gun.PoolConn do
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
 
-  @max_requests 5
-  @count 1
   defstruct [
+    :max_requests,
+    :warming_up_count,
     conn: %{}
   ]
 
@@ -15,8 +15,10 @@ defmodule HTTP2Gun.PoolConn do
   end
 
   def init(_) do
-    state = open_conn(%__MODULE__{conn: %{}}, @count)
-    {:ok, state}
+    max_requests = Application.get_env(:http2_gun, :max_requests)
+    warming_up_count = Application.get_env(:http2_gun, :warming_up_count)
+    state = open_conn(%__MODULE__{conn: %{}}, warming_up_count)
+    {:ok, %{state | max_requests: max_requests, warming_up_count: warming_up_count}}
   end
 
   defp via_tuple(name) do
@@ -66,7 +68,7 @@ defmodule HTTP2Gun.PoolConn do
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
       cond do
-        min_value < @max_requests ->
+        min_value < state.max_requests ->
           IO.puts("------> Even less than MAX_REQUESTS")
           {_, {_, last_name}} = Enum.to_list(state.conn)
                                 |> Enum.max_by(fn {_, {_, name}} ->
@@ -78,24 +80,22 @@ defmodule HTTP2Gun.PoolConn do
           {min_key, new_state}
         true ->
           IO.puts("------> Start new CONNECTION")
-          {state.conn, Enum.count(state.conn)} |> IO.inspect
           GenServer.cast(pid, {self(),
-                         Enum.count(state.conn)})
+                         Enum.count(state.conn), request.host})
           {_, {_, last_name}} = Enum.to_list(state.conn)
                                 |> Enum.max_by(fn {_, {_, name}} ->
-                                                 name end)
-          {:ok, conn_pid} = Worker.start_link(%{host: "example.com",
-                                                port: 443, opts: []},
+                                                name end)
+          {:ok, conn_pid} = Worker.start_link(%{host: request.host,
+                                                port: request.port, opts: []},
                                                 via_tuple(last_name + 1 ))
           new_state = %{state | conn: state.conn
                         |> Map.put(conn_pid, {1, last_name + 1})}
           {conn_pid, new_state}
       end
     end
-    cancel_ref = :erlang.make_ref()
     pid = self()
     spawn_link(fn ->
-      response = GenServer.call(new_pid, {request, cancel_ref})
+      response = GenServer.call(new_pid, request)
       send(pid, {new_pid, :decrement})
       GenServer.reply(from, response) end)
     {:noreply,  new_state} |> IO.inspect

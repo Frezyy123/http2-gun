@@ -34,7 +34,8 @@ defmodule HTTP2Gun.Mixfile do
     [
       {:gun, "~>1.3.0"},
       {:poolboy, ">=0.0.0"},
-      {:logger_file_backend, ">=0.0.0"}
+      {:logger_file_backend, ">=0.0.0"},
+      {:mock, "~> 0.3.0", only: :test}
 
     ]
   end

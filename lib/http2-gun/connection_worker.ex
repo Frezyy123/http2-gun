@@ -69,17 +69,22 @@ defmodule HTTP2Gun.ConnectionWorker do
     IO.puts("-------> Gun RESPONSE")
     {:gun_response, conn_pid, stream_ref} |> IO.inspect
     {from, response, cancel_ref, timer_ref} = Map.get(state.streams, stream_ref)
-    response = %Response{response | headers: headers,
+    state_new = case state.streams |> Map.get(stream_ref) do
+      nil ->
+        {:noreply, state}
+      {from, response, cancel_ref, timer_ref} ->
+            response = %Response{response | headers: headers,
                          status_code: status}
-    state_new = case is_fin do
-      :fin -> continue(stream_ref, is_fin,
-                  from, response,
-                  cancel_ref, timer_ref,
-                  state)
-      :nofin -> reply(stream_ref, is_fin,
-                  from, response,
-                  cancel_ref, timer_ref,
-                  state)
+        case is_fin do
+            :fin -> continue(stream_ref, is_fin,
+                        from, response,
+                        cancel_ref, timer_ref,
+                        state)
+            :nofin -> reply(stream_ref, is_fin,
+                        from, response,
+                        cancel_ref, timer_ref,
+                        state)
+        end
     end
     {:noreply, state_new}
   end

@@ -15,10 +15,16 @@ defmodule HTTP2Gun.PoolConn do
   end
 
   def init(_) do
-    max_requests = Application.get_env(:http2_gun, :max_requests)
-    warming_up_count = Application.get_env(:http2_gun, :warming_up_count)
-    state = open_conn(%__MODULE__{conn: %{}}, warming_up_count)
-    {:ok, %{state | max_requests: max_requests, warming_up_count: warming_up_count}}
+    app_env = Application.get_all_env(:http2_gun)
+              |> Enum.into(%{})
+    max_requests = app_env |> Map.get(:max_requests)
+    warming_up_count = app_env |> Map.get(:warming_up_count)
+    default_hostname = app_env |> Map.get(:default_hostname)
+    default_port = app_env |> Map.get(:default_port)
+    state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
+                      default_hostname, default_port)
+    {:ok, %{state |
+            max_requests: max_requests, warming_up_count: warming_up_count}}
   end
 
   defp via_tuple(name) do
@@ -42,13 +48,14 @@ defmodule HTTP2Gun.PoolConn do
   #   {:noreply, state}
   # end
 
-  defp open_conn(state, count) do
+  defp open_conn(state, count, host, port) do
     pid_list = Enum.map(1..count,
                 fn name ->
-                  {:ok, conn_pid} = Worker.start_link(%{host: "example.org", port: 443,
+                  {:ok, conn_pid} = Worker.start_link(%{host: host, port: port,
                                                         opts: []},
                                                         via_tuple(name))
                   {conn_pid, name} end)
+
     conn_map = Enum.map(pid_list,
                  fn {conn_pid, name} ->
                    {conn_pid, name} end)
@@ -67,17 +74,20 @@ defmodule HTTP2Gun.PoolConn do
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
+
       cond do
         min_value < state.max_requests ->
           IO.puts("------> Even less than MAX_REQUESTS")
           {_, {_, last_name}} = Enum.to_list(state.conn)
                                 |> Enum.max_by(fn {_, {_, name}} ->
                                                  name end)
+
           new_state =  %{state | conn: state.conn
                          |> Map.update!(min_key,
                               fn {x, last_name} ->
                                 {x + 1, last_name} end)}
           {min_key, new_state}
+
         true ->
           IO.puts("------> Start new CONNECTION")
           GenServer.cast(pid, {self(),

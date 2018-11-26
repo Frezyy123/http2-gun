@@ -9,14 +9,6 @@ defmodule HTTP2Gun do
     request("POST", url, body, headers, opts)
   end
 
-  def put(url, body, headers \\ [], opts \\ %{}) do
-    request("PUT", url, body, headers, opts)
-  end
-
-  def delete(url, headers \\ [], opts \\ %{}) do
-    request("DELETE", url, "", headers, opts)
-  end
-
   def get!(url, headers \\ [], opts \\ %{}) do
     request!("GET", url, "", headers, opts)
   end
@@ -57,7 +49,8 @@ defmodule HTTP2Gun do
                              path: path,
                              headers: headers,
                              body: body,
-                             opts: opts}
+                             opts: opts,
+                             port: port}
         GenServer.call(pid, request)
     true ->
                 {:error, "Error URI"}
@@ -70,11 +63,11 @@ defmodule HTTP2Gun do
     # GenServer.call(pid, request_test)
   end
   def request_test(pid) do
-    request(pid, :get, "http://example.org/:443", "")
+    request(pid, :get, "http://example.org:443/", "")
   end
 
   def request_test_new(pid) do
-    request(pid, :get, "http://en.wikipedia.org/:443", "")
+    request(pid, :get, "http://en.wikipedia.org:443/", "")
   end
 
 end

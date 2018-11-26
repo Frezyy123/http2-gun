@@ -2,15 +2,7 @@ defmodule HTTP2Gun.ConnectionWorker do
   use GenServer
   alias HTTP2Gun.ConnectionWorker, as: Worker
   alias HTTP2Gun.Request
-
-  defmodule Response do
-    defstruct [
-      :request_url,
-      :status_code,
-      :headers,
-      :body
-    ]
-  end
+  alias HTTP2Gun.Response
 
   defstruct [
     :host,
@@ -52,11 +44,11 @@ defmodule HTTP2Gun.ConnectionWorker do
         response = %Response{response | body: data}
         state_new =
           case is_fin do
-            :fin -> continue(stream_ref, is_fin,
+            :nofin -> continue(stream_ref, is_fin,
                         from, response,
                         cancel_ref, timer_ref,
                         state)
-            :nofin -> reply(stream_ref, is_fin,
+            :fin -> reply(stream_ref, is_fin,
                         from, response,
                         cancel_ref, timer_ref,
                         state)
@@ -76,11 +68,11 @@ defmodule HTTP2Gun.ConnectionWorker do
             response = %Response{response | headers: headers,
                          status_code: status}
         case is_fin do
-            :fin -> continue(stream_ref, is_fin,
+            :nofin -> continue(stream_ref, is_fin,
                         from, response,
                         cancel_ref, timer_ref,
                         state)
-            :nofin -> reply(stream_ref, is_fin,
+            :fin -> reply(stream_ref, is_fin,
                         from, response,
                         cancel_ref, timer_ref,
                         state)
@@ -88,6 +80,7 @@ defmodule HTTP2Gun.ConnectionWorker do
     end
     {:noreply, state_new}
   end
+
   def handle_info({:timeout, from, cancel_ref},
                   %Worker{gun_pid: gun_pid, cancels: cancels}=state) do
     IO.puts("-------> TIMEOUT")
@@ -117,7 +110,7 @@ defmodule HTTP2Gun.ConnectionWorker do
   #   {:noreply, state}
   # end
 
-  def handle_call(%Request{method: method, path: path}=_request, from,
+  def handle_call(%Request{method: method, path: path}, from,
                     %Worker{streams: streams, cancels: cancels}=state) do
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()

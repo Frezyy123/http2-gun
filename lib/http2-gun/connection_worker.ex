@@ -10,8 +10,6 @@ defmodule HTTP2Gun.ConnectionWorker do
     :opts,
     :gun_pid,
     :gun_ref,
-    :m_mod,
-    :m_state,
     streams: %{},
     cancels: %{}
   ]
@@ -62,8 +60,8 @@ defmodule HTTP2Gun.ConnectionWorker do
       nil ->
         {:noreply, state}
       {from, response, cancel_ref, timer_ref} ->
-            response = %Response{response | headers: headers,
-                         status_code: status}
+        response = %Response{response | headers: headers,
+                          status_code: status}
         case is_fin do
             :nofin -> continue(stream_ref, is_fin,
                         from, response,
@@ -106,7 +104,7 @@ defmodule HTTP2Gun.ConnectionWorker do
                     %Worker{streams: streams, cancels: cancels}=state) do
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()
-    timer_ref = Process.send_after(self(), {:timeout, from, cancel_ref}, 2000)
+    timer_ref = Process.send_after(self(), {:timeout, from, cancel_ref}, 5000)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
                               String.to_charlist(path), [])
     {:noreply, %{state |

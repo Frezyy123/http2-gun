@@ -6,32 +6,25 @@ defmodule HTTP2Gun.ServerTest do
 
   import Mock
 
-  defp via_tuple(name) do
-    {:via, HTTP2Gun.Registry,
-           {:conn_name, name}}
-  end
-
   setup do
     {:ok, pid} = HTTP2Gun.PoolGroup.start_link()
     {:ok, %{pid: pid}}
   end
 
-
   test "simple request", %{pid: pid} do
-    pids = Enum.map(1..5, fn x -> pid end)
+    pids = Enum.map(1..20, fn x -> pid end)
     Enum.map(1..2, fn x ->
       pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
+        |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test(&1) end)))
+        |> Enum.map(&(Task.await(&1))) |> IO.inspect end)
     Enum.map(1..2, fn x ->
       pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+        |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test_new(&1) end)))
         |> Enum.map(&(Task.await(&1))) end)
   end
 
-
-  def request_test(pid) do
-    HTTP2Gun.request(pid, :get, "http2://example.org:443/", "")
+  test "request test", %{pid: pid} do
+    {time, result} = :timer.tc(fn -> HTTP2Gun.request_test(pid) end) |> IO.inspect
   end
 
   test "Request interface" do
@@ -70,7 +63,7 @@ defmodule HTTP2Gun.ServerTest do
         assert {:noreply, state} == Worker.handle_info({:timeout, from, ref}, state)
         # should delete cancels map and streams map and return the same state
         assert {:noreply, state} == Worker.handle_info({:timeout, from, ref},  %{state | cancels: Map.put(%{},ref, ref),
-        streams: Map.put(%{},ref, ref)}) |> IO.inspect
+        streams: Map.put(%{},ref, ref)})
         # stub, so nothing to test
         assert {:noreply, %Worker{}} = Worker.handle_info({:gun_error, "_", "_", "_"}, state)
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
@@ -126,7 +119,7 @@ defmodule HTTP2Gun.ServerTest do
                                     {key, {100, conn_name}} end)
                       |> Enum.into(%{})}
 
-    test_state = %{state | conn: update_state
+    test_state = %{state | conn: update_state.conn
                                 |> Map.put('#PID<0.209.0>', {0, conn_name + 1})
                                 |> Map.keys
                                 |> Enum.count}
@@ -162,9 +155,4 @@ defmodule HTTP2Gun.ServerTest do
     assert new_state == %{state | pools: res_state.pools
                         |> Map.keys}
   end
-
-  test "Restrict nubmer of connection" do
-
-  end
-
 end

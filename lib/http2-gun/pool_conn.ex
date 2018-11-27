@@ -2,10 +2,10 @@ defmodule HTTP2Gun.PoolConn do
   use GenServer
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
-  @max_connections 5
   defstruct [
     :max_requests,
     :warming_up_count,
+    :max_connections,
     conn: %{}
   ]
 
@@ -21,15 +21,12 @@ defmodule HTTP2Gun.PoolConn do
     warming_up_count = app_env |> Map.get(:warming_up_count)
     default_hostname = app_env |> Map.get(:default_hostname)
     default_port = app_env |> Map.get(:default_port)
+    max_connections = app_env |> Map.get(:max_connections)
     state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
                       default_hostname, default_port)
     {:ok, %{state |
-            max_requests: max_requests, warming_up_count: warming_up_count}}
-  end
-
-  defp via_tuple(name) do
-    {:via, HTTP2Gun.Registry,
-           {:conn_name, name}}
+            max_requests: max_requests, warming_up_count: warming_up_count,
+            max_connections: max_connections}}
   end
 
   def handle_info({pid, :decrement}, state) do
@@ -38,7 +35,7 @@ defmodule HTTP2Gun.PoolConn do
                   |> Map.update!(pid,
                     fn {x, name} ->
                       {x - 1, name} end)}
-    {:noreply, next_conn} |> IO.inspect
+    {:noreply, next_conn}
   end
 
   # def handle_info(msg, state) do
@@ -65,12 +62,9 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_call({request, pid}, from, state) do
     IO.puts("---> Handle call POOL")
-
-
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
-
       {new_pid, new_state} = cond do
         min_value < state.max_requests ->
           IO.puts("------> Even less than MAX_REQUESTS")
@@ -85,7 +79,7 @@ defmodule HTTP2Gun.PoolConn do
           {min_key, new_state}
 
         true ->
-          if (Enum.count(state.conn) < @max_connections) do
+          if (Enum.count(state.conn) < state.max_connections) do
             IO.puts("------> Start new CONNECTION")
             GenServer.cast(pid, {self(),
                           Enum.count(state.conn), request.host})
@@ -98,8 +92,8 @@ defmodule HTTP2Gun.PoolConn do
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
             {conn_pid, new_state}
-          else
-            {nil, state}
+          # else
+          #   {nil, state}
           end
       end
 

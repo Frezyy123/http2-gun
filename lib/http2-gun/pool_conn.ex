@@ -2,7 +2,7 @@ defmodule HTTP2Gun.PoolConn do
   use GenServer
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
-
+  @max_connections 5
   defstruct [
     :max_requests,
     :warming_up_count,
@@ -51,8 +51,7 @@ defmodule HTTP2Gun.PoolConn do
     pid_list = Enum.map(1..count,
                 fn name ->
                   {:ok, conn_pid} = Worker.start_link(%{host: host, port: port,
-                                                        opts: []},
-                                                        via_tuple(name))
+                                                        opts: []})
                   {conn_pid, name} end)
     conn_map = Enum.map(pid_list,
                  fn {conn_pid, name} ->
@@ -66,13 +65,13 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_call({request, pid}, from, state) do
     IO.puts("---> Handle call POOL")
-    {new_pid, new_state} =
-      if !Enum.empty?(state.conn) do
+
+
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
 
-      cond do
+      {new_pid, new_state} = cond do
         min_value < state.max_requests ->
           IO.puts("------> Even less than MAX_REQUESTS")
           {_, {_, last_name}} = Enum.to_list(state.conn)
@@ -86,25 +85,34 @@ defmodule HTTP2Gun.PoolConn do
           {min_key, new_state}
 
         true ->
-          IO.puts("------> Start new CONNECTION")
-          GenServer.cast(pid, {self(),
-                         Enum.count(state.conn), request.host})
-          {_, {_, last_name}} = Enum.to_list(state.conn)
-                                |> Enum.max_by(fn {_, {_, name}} ->
-                                                name end)
-          {:ok, conn_pid} = Worker.start_link(%{host: request.host,
-                                                port: request.port, opts: []},
-                                                via_tuple(last_name + 1 ))
-          new_state = %{state | conn: state.conn
-                        |> Map.put(conn_pid, {1, last_name + 1})}
-          {conn_pid, new_state}
+          if (Enum.count(state.conn) < @max_connections) do
+            IO.puts("------> Start new CONNECTION")
+            GenServer.cast(pid, {self(),
+                          Enum.count(state.conn), request.host})
+            {_, {_, last_name}} = Enum.to_list(state.conn)
+                                  |> Enum.max_by(fn {_, {_, name}} ->
+                                                  name end)
+            {:ok, conn_pid} = Worker.start_link(%{host: request.host,
+                                                  port: request.port, opts: []}
+                                                  )
+            new_state = %{state | conn: state.conn
+                          |> Map.put(conn_pid, {1, last_name + 1})}
+            {conn_pid, new_state}
+          else
+            {nil, state}
+          end
       end
-    end
+
     pid = self()
-    spawn_link(fn ->
-      response = GenServer.call(new_pid, request)
-      send(pid, {new_pid, :decrement})
-      GenServer.reply(from, response) end)
+    case new_pid do
+      nil -> GenServer.reply(from, "error")
+      _ ->
+        spawn_link(fn ->
+          response = GenServer.call(new_pid, request)
+          send(pid, {new_pid, :decrement})
+          GenServer.reply(from, response) end)
+    end
+
     {:noreply,  new_state} |> IO.inspect
   end
 end

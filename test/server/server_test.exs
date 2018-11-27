@@ -16,17 +16,19 @@ defmodule HTTP2Gun.ServerTest do
     {:ok, %{pid: pid}}
   end
 
+
   test "simple request", %{pid: pid} do
     pids = Enum.map(1..5, fn x -> pid end)
     Enum.map(1..2, fn x ->
       pids
         |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
         |> Enum.map(&(Task.await(&1))) end)
-    # Enum.map(1..2, fn x ->
-    #   pids
-    #     |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
-    #     |> Enum.map(&(Task.await(&1))) end)
+    Enum.map(1..2, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
   end
+
 
   def request_test(pid) do
     HTTP2Gun.request(pid, :get, "http2://example.org:443/", "")
@@ -49,6 +51,8 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "ConnectionWorkerTest" do
+      assert {:ok, _pid} = HTTP2Gun.ConnectionWorker.start_link(%Worker{host: "example.org", port: 443, opts: []})
+
       ref = :erlang.make_ref()
       init_state = %Worker{host: "example.org", port: 443, opts: []}
       # init test
@@ -62,16 +66,39 @@ defmodule HTTP2Gun.ServerTest do
       assert not (Enum.empty?(streams) and Enum.empty?(cancels))
       # need to rewrite
       with_mock GenServer, [reply: fn(_,_) -> :ok end] do
-        assert {:noreply, %Worker{}} = Worker.handle_info({:timeout, from, ref}, state)
+        # should return the same
+        assert {:noreply, state} == Worker.handle_info({:timeout, from, ref}, state)
+        # should delete cancels map and streams map and return the same state
+        assert {:noreply, state} == Worker.handle_info({:timeout, from, ref},  %{state | cancels: Map.put(%{},ref, ref),
+        streams: Map.put(%{},ref, ref)}) |> IO.inspect
+        # stub, so nothing to test
         assert {:noreply, %Worker{}} = Worker.handle_info({:gun_error, "_", "_", "_"}, state)
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
-          assert {:noreply, %Worker{}} = Worker.handle_info({:gun_response,self(), ref,
-          :fin, 200, []}, state)
-          assert {:noreply, %Worker{}} = Worker.handle_info({:gun_data, self(), ref, :nofin, ""}, state)
+
+
+          # header check, should return response in streams
+          headers = ["header:values"]
+          assert {:noreply, response_state} = Worker.handle_info({:gun_response,self(), ref,
+          :nofin, 200, headers}, state)
+          {_,response, _, _} = response_state.streams |> Map.values |> hd
+          assert response.headers == headers
+          assert response.status_code == 200
+
+
+          data = "hereisdata"
+          assert {:noreply, data_state} = Worker.handle_info({:gun_data, self(), ref, :nofin, data}, state)
+          {_,response, _, _} = data_state.streams |> Map.values |> hd
+          assert response.body == data
+
         end
+
       end
-      assert {:noreply, %Worker{}} = Worker.handle_info({:gun_up, self(), :http2}, state)
+
+      assert {:noreply, gunup_state} = Worker.handle_info({:gun_up, self(), :http2}, state)
+      assert  nil != gunup_state.gun_pid
+
   end
+
 
   test "PoolConn handle_call() test" do
     #start_link PoolCoon
@@ -135,4 +162,9 @@ defmodule HTTP2Gun.ServerTest do
     assert new_state == %{state | pools: res_state.pools
                         |> Map.keys}
   end
+
+  test "Restrict nubmer of connection" do
+
+  end
+
 end

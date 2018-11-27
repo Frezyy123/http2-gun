@@ -30,13 +30,11 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_up, conn_pid, protocol}, state) do
     IO.puts("-------> Gun UP")
-    {:gun_up, conn_pid, protocol} |> IO.inspect
     {:noreply, state}
   end
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
-    {:gun_data, conn_pid} |> IO.inspect
     case state.streams |> Map.get(stream_ref) do
       nil ->
         {:noreply, state}
@@ -59,7 +57,6 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
     IO.puts("-------> Gun RESPONSE")
-    {:gun_response, conn_pid, stream_ref} |> IO.inspect
     {from, response, cancel_ref, timer_ref} = Map.get(state.streams, stream_ref)
     state_new = case state.streams |> Map.get(stream_ref) do
       nil ->

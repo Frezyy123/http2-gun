@@ -28,7 +28,6 @@ defmodule HTTP2Gun.PoolConn do
   end
 
   defp via_tuple(name) do
-    name |> IO.inspect
     {:via, HTTP2Gun.Registry,
            {:conn_name, name}}
   end
@@ -55,7 +54,6 @@ defmodule HTTP2Gun.PoolConn do
                                                         opts: []},
                                                         via_tuple(name))
                   {conn_pid, name} end)
-
     conn_map = Enum.map(pid_list,
                  fn {conn_pid, name} ->
                    {conn_pid, name} end)
@@ -63,7 +61,6 @@ defmodule HTTP2Gun.PoolConn do
                  fn {pid, name}, acc ->
                    Map.merge(acc, Map.put(%{},
                              pid, {0, name})) end)
-               |> IO.inspect
     %{state | conn: conn_map}
   end
 

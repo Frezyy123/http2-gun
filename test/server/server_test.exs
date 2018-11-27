@@ -17,15 +17,15 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "simple request", %{pid: pid} do
-    pids = Enum.map(1..150, fn x -> pid end)
+    pids = Enum.map(1..5, fn x -> pid end)
     Enum.map(1..2, fn x ->
       pids
         |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
         |> Enum.map(&(Task.await(&1))) end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
+    # Enum.map(1..2, fn x ->
+    #   pids
+    #     |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+    #     |> Enum.map(&(Task.await(&1))) end)
   end
 
   def request_test(pid) do
@@ -74,10 +74,11 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "PoolConn handle_call() test" do
+    #start_link PoolCoon
     assert {:ok, pid} = HTTP2Gun.PoolConn.start_link()
-
-    {:ok, state} = HTTP2Gun.PoolConn.init(1) #|> IO.inspect
-    make_fer = self()
+    #add stream to connection from state
+    {:ok, state} = HTTP2Gun.PoolConn.init(1)
+    make_ref = self()
     {key, {_streams, conn_name}} = state.conn
                                    |> Map.to_list()
                                    |> hd
@@ -92,12 +93,35 @@ defmodule HTTP2Gun.ServerTest do
                                                                           body: "",
                                                                           opts: %{}},
                                                                   pid}, make_ref, state)
+    #add new connection, when all connection is filled
+    update_state = %{state | conn: state.conn
+                      |> Enum.map(fn {key, {streams, conn_name}} ->
+                                    {key, {100, conn_name}} end)
+                      |> Enum.into(%{})}
+
+    test_state = %{state | conn: update_state
+                                |> Map.put('#PID<0.209.0>', {0, conn_name + 1})
+                                |> Map.keys
+                                |> Enum.count}
+
+    {:noreply, res_state} = HTTP2Gun.PoolConn.handle_call({%Request{host: "example.com",
+                                                                    method: "GET",
+                                                                    path: "/",
+                                                                    headers: [],
+                                                                    body: "",
+                                                                    opts: %{}},
+                                                            pid}, make_ref, update_state)
+    assert test_state == %{state | conn: res_state.conn
+                                  |> Map.keys
+                                  |> Enum.count}
   end
 
   test "PoolGroup handle_call() test" do
+    #start_link PoolGroup
     assert {:ok, pid} = HTTP2Gun.PoolGroup.start_link()
-    {:ok, state} = HTTP2Gun.PoolGroup.init(1) |> IO.inspect
-    make_fer = self()
+    #add new pool to pools from state
+    {:ok, state} = HTTP2Gun.PoolGroup.init(1)
+    make_ref = self()
     new_state = %{state | pools: state.pools
                             |> Map.put("example.com", {"example.com", '#PID<0.209.0>', 0})
                             |> Map.keys}

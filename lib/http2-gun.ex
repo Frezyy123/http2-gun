@@ -27,7 +27,7 @@ defmodule HTTP2Gun do
     :opts
   """
   def request(pid, method, url, body, headers \\ [], opts \\ %{}) do
-    case URI.parse(url)|> IO.inspect do
+    case URI.parse(url) do
       %URI{
         scheme: scheme,
         host: host,

@@ -17,19 +17,19 @@ defmodule HTTP2Gun.ServerTest do
   end
 
 
-  # test "simple request", %{pid: pid} do
-  #   pids = Enum.map(1..1, fn x -> pid end)
+  test "simple request", %{pid: pid} do
+    pids = Enum.map(1..1, fn x -> pid end)
 
-  #   Enum.map(1..2, fn x ->
-  #     pids
-  #       |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
-  #       |> Enum.map(&(Task.await(&1))) end)
-  #   Enum.map(1..2, fn x ->
-  #     pids
-  #       |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
-  #       |> Enum.map(&(Task.await(&1))) end)
+    Enum.map(1..2, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
+    Enum.map(1..2, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
 
-  # end
+  end
 
 
   def request_test(pid) do
@@ -53,6 +53,8 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "ConnectionWorkerTest" do
+      assert {:ok, _pid} = HTTP2Gun.ConnectionWorker.start_link(%Worker{host: "example.org", port: 443, opts: []})
+
       ref = :erlang.make_ref()
       init_state = %Worker{host: "example.org", port: 443, opts: []}
       # init test
@@ -95,16 +97,16 @@ defmodule HTTP2Gun.ServerTest do
       end
 
       assert {:noreply, gunup_state} = Worker.handle_info({:gun_up, self(), :http2}, state)
-      assert pid = gunup_state.gun_pid
-
+      assert  nil != gunup_state.gun_pid
 
   end
+
 
   test "PoolConn handle_call() test" do
     assert {:ok, pid} = HTTP2Gun.PoolConn.start_link()
 
     {:ok, state} = HTTP2Gun.PoolConn.init(1) #|> IO.inspect
-    make_fer = self()
+    make_ref = self()
     {key, {_streams, conn_name}} = state.conn
                                    |> Map.to_list()
                                    |> hd
@@ -124,7 +126,7 @@ defmodule HTTP2Gun.ServerTest do
   test "PoolGroup handle_call() test" do
     assert {:ok, pid} = HTTP2Gun.PoolGroup.start_link()
     {:ok, state} = HTTP2Gun.PoolGroup.init(1) |> IO.inspect
-    make_fer = self()
+    make_ref = self()
     new_state = %{state | pools: state.pools
                             |> Map.put("example.com", {"example.com", '#PID<0.209.0>', 0})
                             |> Map.keys}
@@ -138,4 +140,9 @@ defmodule HTTP2Gun.ServerTest do
     assert new_state == %{state | pools: res_state.pools
                         |> Map.keys}
   end
+
+  test "Restrict nubmer of connection" do
+
+  end
+
 end

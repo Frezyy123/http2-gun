@@ -16,7 +16,7 @@ defmodule HTTP2Gun.ConnectionWorker do
     cancels: %{}
   ]
 
-  def start_link(state, _name) do
+  def start_link(state) do
     {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state)
     {:ok, pid}
   end

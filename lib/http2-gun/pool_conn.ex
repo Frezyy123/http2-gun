@@ -9,21 +9,21 @@ defmodule HTTP2Gun.PoolConn do
     conn: %{}
   ]
 
-  def start_link() do
-    {:ok, pid} = GenServer.start_link(__MODULE__, [])
+  def start_link(hostname) do
+    {:ok, pid} = GenServer.start_link(__MODULE__, hostname)
     {:ok, pid}
   end
 
-  def init(_) do
+  def init(hostname) do
     app_env = Application.get_all_env(:http2_gun)
               |> Enum.into(%{})
     max_requests = app_env |> Map.get(:max_requests)
     warming_up_count = app_env |> Map.get(:warming_up_count)
-    default_hostname = app_env |> Map.get(:default_hostname)
+    hostname = hostname
     default_port = app_env |> Map.get(:default_port)
     max_connections = app_env |> Map.get(:max_connections)
     state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
-                      default_hostname, default_port)
+                      hostname, default_port)
     {:ok, %{state |
             max_requests: max_requests, warming_up_count: warming_up_count,
             max_connections: max_connections}}

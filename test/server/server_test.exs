@@ -11,20 +11,20 @@ defmodule HTTP2Gun.ServerTest do
     {:ok, %{pid: pid}}
   end
 
-  test "simple request", %{pid: pid} do
-    pids = Enum.map(1..20, fn x -> pid end)
-    Enum.map(1..2, fn x ->
+  test "Simple request", %{pid: pid} do
+    pids = Enum.map(1..1, fn x -> pid end)
+    Enum.map(1..1, fn x ->
       pids
         |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test(&1) end)))
-        |> Enum.map(&(Task.await(&1))) |> IO.inspect end)
-    Enum.map(1..2, fn x ->
+        |> Enum.map(&(Task.await(&1))) end)
+    Enum.map(1..1, fn x ->
       pids
         |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test_new(&1) end)))
         |> Enum.map(&(Task.await(&1))) end)
   end
 
-  test "request test", %{pid: pid} do
-    {time, result} = :timer.tc(fn -> HTTP2Gun.request_test(pid) end) |> IO.inspect
+  test "Request test with timer", %{pid: pid} do
+    {time, result} = :timer.tc(fn -> HTTP2Gun.request_test_new(pid) end) |> IO.inspect
   end
 
   test "Request interface" do
@@ -95,9 +95,9 @@ defmodule HTTP2Gun.ServerTest do
 
   test "PoolConn handle_call() test" do
     #start_link PoolCoon
-    assert {:ok, pid} = HTTP2Gun.PoolConn.start_link()
+    assert {:ok, pid} = HTTP2Gun.PoolConn.start_link("example.com")
     #add stream to connection from state
-    {:ok, state} = HTTP2Gun.PoolConn.init(1)
+    {:ok, state} = HTTP2Gun.PoolConn.init("example.com")
     make_ref = self()
     {key, {_streams, conn_name}} = state.conn
                                    |> Map.to_list()

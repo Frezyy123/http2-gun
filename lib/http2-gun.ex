@@ -61,7 +61,7 @@ defmodule HTTP2Gun do
   end
 
   def request_test(pid) do
-    request(pid, :get, "http://zeroloader.xyz:443/", "")
+    request(pid, :get, "http://facebook.com:443/", "")
   end
 
   def request_test_new(pid) do

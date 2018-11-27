@@ -7,18 +7,16 @@ defmodule HTTP2Gun.ServerTest do
   import Mock
 
   defp via_tuple(name) do
-    name |> IO.inspect
     {:via, HTTP2Gun.Registry,
            {:conn_name, name}}
   end
 
   setup do
-
     {:ok, pid} = HTTP2Gun.PoolGroup.start_link()
-
     {:ok, %{pid: pid}}
   end
 
+<<<<<<< HEAD
   # test "simple request", %{pid: pid} do
   #   pids = Enum.map(1..1, fn x -> pid end)
 
@@ -32,13 +30,23 @@ defmodule HTTP2Gun.ServerTest do
   #       |> Enum.map(&(Task.await(&1))) end)
 
   # end
-
-
+=======
+  test "simple request", %{pid: pid} do
+    pids = Enum.map(1..150, fn x -> pid end)
+    Enum.map(1..2, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
+    Enum.map(1..2, fn x ->
+      pids
+        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+        |> Enum.map(&(Task.await(&1))) end)
+  end
+>>>>>>> af2e1bca9a43b427f51948516eeecaa0da678bf7
 
   def request_test(pid) do
     HTTP2Gun.request(pid, :get, "http2://example.org:443/", "")
   end
-
 
   test "Request interface" do
     # forming request test
@@ -50,35 +58,24 @@ defmodule HTTP2Gun.ServerTest do
                       body: "",
                       opts: %{},
                       port: 443} ==   HTTP2Gun.request(self(), :get, "http2://example.org:443/", "")
-
       # convertation test
       assert "GET" == HTTP2Gun.request(self(), :get, "http2://example.org:443/", "").method
       assert "PUT" == HTTP2Gun.request(self(), :put, "http2://example.org:443/", "").method
-
     end
-
-
-
   end
 
   test "ConnectionWorkerTest" do
-
       ref = :erlang.make_ref()
       init_state = %Worker{host: "example.org", port: 443, opts: []}
-
-
       # init test
       assert {:ok, init_state} = Worker.init(%{host: "example.org", port: 443, opts: []})
 
       {:ok, state} = Worker.init(init_state)
       from = {ref, self()}
-
-
       # streams and cancels not empty
       {:noreply, %Worker{streams: streams, cancels: cancels}} =
                                               Worker.handle_call(%Request{method: "GET", path: "/"}, from, state)
       assert not (Enum.empty?(streams) and Enum.empty?(cancels))
-
       # need to rewrite
       with_mock GenServer, [reply: fn(_,_) -> :ok end] do
         # should return the same
@@ -88,8 +85,8 @@ defmodule HTTP2Gun.ServerTest do
         streams: Map.put(%{},ref, ref)}) |> IO.inspect
         # stub, so nothing to test
         assert {:noreply, %Worker{}} = Worker.handle_info({:gun_error, "_", "_", "_"}, state)
-
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
+<<<<<<< HEAD
 
           # header check, should return response in streams
           headers = ["header:values"]
@@ -113,6 +110,9 @@ defmodule HTTP2Gun.ServerTest do
       assert pid = gunup_state.gun_pid
 
 
+=======
+
+>>>>>>> af2e1bca9a43b427f51948516eeecaa0da678bf7
   end
 
   test "PoolConn handle_call() test" do
@@ -127,7 +127,6 @@ defmodule HTTP2Gun.ServerTest do
                    |> Map.update!(key, fn current_value ->
                                         {1, conn_name} end)
     new_state = %{state | conn: update_state}
-
     assert {:noreply, new_state} == HTTP2Gun.PoolConn.handle_call({%Request{host: "example.com",
                                                                           method: "GET",
                                                                           path: "/",
@@ -138,14 +137,12 @@ defmodule HTTP2Gun.ServerTest do
   end
 
   test "PoolGroup handle_call() test" do
-
     assert {:ok, pid} = HTTP2Gun.PoolGroup.start_link()
     {:ok, state} = HTTP2Gun.PoolGroup.init(1) |> IO.inspect
     make_fer = self()
     new_state = %{state | pools: state.pools
                             |> Map.put("example.com", {"example.com", '#PID<0.209.0>', 0})
                             |> Map.keys}
-
     {:noreply, res_state} = HTTP2Gun.PoolGroup.handle_call(%Request{host: "example.com",
                                                                           method: "GET",
                                                                           path: "/",
@@ -156,6 +153,4 @@ defmodule HTTP2Gun.ServerTest do
     assert new_state == %{state | pools: res_state.pools
                         |> Map.keys}
   end
-
-
 end

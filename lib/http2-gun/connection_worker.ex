@@ -100,11 +100,6 @@ defmodule HTTP2Gun.ConnectionWorker do
     {:noreply, state}
   end
 
-  # def handle_info(:timeout, state) do
-  #   IO.puts("TIMEOUT")
-  #   {:noreply, state}
-  # end
-
   # def handle_info(msg, state) do
   #   msg |> IO.inspect
   #   {:noreply, state}

@@ -16,7 +16,7 @@ defmodule HTTP2Gun.ServerTest do
     {:ok, %{pid: pid}}
   end
 
-<<<<<<< HEAD
+
   # test "simple request", %{pid: pid} do
   #   pids = Enum.map(1..1, fn x -> pid end)
 
@@ -30,19 +30,7 @@ defmodule HTTP2Gun.ServerTest do
   #       |> Enum.map(&(Task.await(&1))) end)
 
   # end
-=======
-  test "simple request", %{pid: pid} do
-    pids = Enum.map(1..150, fn x -> pid end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
-  end
->>>>>>> af2e1bca9a43b427f51948516eeecaa0da678bf7
+
 
   def request_test(pid) do
     HTTP2Gun.request(pid, :get, "http2://example.org:443/", "")
@@ -86,7 +74,7 @@ defmodule HTTP2Gun.ServerTest do
         # stub, so nothing to test
         assert {:noreply, %Worker{}} = Worker.handle_info({:gun_error, "_", "_", "_"}, state)
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
-<<<<<<< HEAD
+
 
           # header check, should return response in streams
           headers = ["header:values"]
@@ -110,9 +98,6 @@ defmodule HTTP2Gun.ServerTest do
       assert pid = gunup_state.gun_pid
 
 
-=======
-
->>>>>>> af2e1bca9a43b427f51948516eeecaa0da678bf7
   end
 
   test "PoolConn handle_call() test" do

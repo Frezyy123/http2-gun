@@ -19,19 +19,19 @@ defmodule HTTP2Gun.ServerTest do
     {:ok, %{pid: pid}}
   end
 
-  test "simple request", %{pid: pid} do
-    pids = Enum.map(1..150, fn x -> pid end)
+  # test "simple request", %{pid: pid} do
+  #   pids = Enum.map(1..1, fn x -> pid end)
 
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
+  #   Enum.map(1..2, fn x ->
+  #     pids
+  #       |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test(&1) end)))
+  #       |> Enum.map(&(Task.await(&1))) end)
+  #   Enum.map(1..2, fn x ->
+  #     pids
+  #       |> Enum.map(&(Task.async(fn  -> HTTP2Gun.request_test_new(&1) end)))
+  #       |> Enum.map(&(Task.await(&1))) end)
 
-  end
+  # end
 
 
 
@@ -81,20 +81,36 @@ defmodule HTTP2Gun.ServerTest do
 
       # need to rewrite
       with_mock GenServer, [reply: fn(_,_) -> :ok end] do
-        assert {:noreply, %Worker{}} = Worker.handle_info({:timeout, from, ref}, state)
+        # should return the same
+        assert {:noreply, state} == Worker.handle_info({:timeout, from, ref}, state)
+        # should delete cancels map and streams map and return the same state
+        assert {:noreply, state} == Worker.handle_info({:timeout, from, ref},  %{state | cancels: Map.put(%{},ref, ref),
+        streams: Map.put(%{},ref, ref)}) |> IO.inspect
+        # stub, so nothing to test
         assert {:noreply, %Worker{}} = Worker.handle_info({:gun_error, "_", "_", "_"}, state)
 
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
-          assert {:noreply, %Worker{}} = Worker.handle_info({:gun_response,self(), ref,
-          :fin, 200, []}, state)
-          assert {:noreply, %Worker{}} = Worker.handle_info({:gun_data, self(), ref, :nofin, ""}, state)
-        end
 
+          # header check, should return response in streams
+          headers = ["header:values"]
+          assert {:noreply, response_state} = Worker.handle_info({:gun_response,self(), ref,
+          :nofin, 200, headers}, state)
+          {_,response, _, _} = response_state.streams |> Map.values |> hd
+          assert response.headers == headers
+          assert response.status_code == 200
+
+
+          data = "hereisdata"
+          assert {:noreply, data_state} = Worker.handle_info({:gun_data, self(), ref, :nofin, data}, state)
+          {_,response, _, _} = data_state.streams |> Map.values |> hd
+          assert response.body == data
+
+        end
 
       end
 
-      assert {:noreply, %Worker{}} = Worker.handle_info({:gun_up, self(), :http2}, state)
-
+      assert {:noreply, gunup_state} = Worker.handle_info({:gun_up, self(), :http2}, state)
+      assert pid = gunup_state.gun_pid
 
 
   end

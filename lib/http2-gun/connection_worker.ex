@@ -129,7 +129,7 @@ defmodule HTTP2Gun.ConnectionWorker do
     }
   end
 
-  defp reply(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
+  def reply(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
               %Worker{streams: _streams, cancels: _cancels}=state) do
     Process.cancel_timer(timer_ref)
     :ok = GenServer.reply(from, {:ok, response})

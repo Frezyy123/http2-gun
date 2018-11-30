@@ -33,7 +33,8 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
-    case state.streams |> Map.get(stream_ref) do
+    data
+    case state.streams |> Map.get(stream_ref)do
       nil ->
         {:noreply, state}
       {from, response, cancel_ref, timer_ref} ->
@@ -122,11 +123,13 @@ defmodule HTTP2Gun.ConnectionWorker do
   def reply(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
               %Worker{streams: _streams, cancels: _cancels}=state) do
     Process.cancel_timer(timer_ref)
+
     :ok = GenServer.reply(from, {:ok, response})
     clean_refs(state, stream_ref, cancel_ref)
   end
 
   defp clean_refs(%Worker{streams: streams, cancels: cancels} = state, stream_ref, cancel_ref) do
+
     %{state |
         streams: (
           streams |> Map.delete(stream_ref)
@@ -137,7 +140,7 @@ defmodule HTTP2Gun.ConnectionWorker do
       }
   end
 
-  defp continue(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
+  def continue(stream_ref, _is_fin, from, response, cancel_ref, timer_ref,
                 %Worker{streams: streams}=state) do
     %{state |
       streams: (

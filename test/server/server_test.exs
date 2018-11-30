@@ -11,16 +11,38 @@ defmodule HTTP2Gun.ServerTest do
     {:ok, %{pid: pid}}
   end
 
-  test "simple request", %{pid: pid} do
-    pids = Enum.map(1..20, fn x -> pid end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test(&1) end)))
-        |> Enum.map(&(Task.await(&1))) |> IO.inspect end)
-    Enum.map(1..2, fn x ->
-      pids
-        |> Enum.map(&(Task.async(fn -> HTTP2Gun.request_test_new(&1) end)))
-        |> Enum.map(&(Task.await(&1))) end)
+  test "restriction_test", %{pid: pid} do
+    # more than 100 in connection
+    pids = Enum.map(1..45, fn x -> pid end)
+
+    IO.puts("++++++++++++++++++++++++++++=")
+    result = Enum.reduce(1..1, [], fn x, acc ->
+                        pids
+                        |> Enum.map(&(Task.async(fn ->  acc ++ HTTP2Gun.request_test(&1)
+                          end)))
+                        |> Enum.map(fn x ->Task.await(x) end)
+                          end)
+        IO.puts(" HERE IS EXAMPLE") |> IO.inspect
+    IO.puts("++++++++++++++++++++++++++++=")
+
+    assert true =="error" in result
+
+    # less than 100
+    pids = Enum.map(1..1, fn x -> pid end)
+
+    IO.puts("++++++++++++++++++++++++++++=")
+    result = Enum.reduce(1..1, [], fn x, acc ->
+                        pids
+                        |> Enum.map(&(Task.async(fn ->  acc ++ HTTP2Gun.request_test(&1)
+                          end)))
+                        |> Enum.map(fn x ->Task.await(x) end)
+                          end)
+        IO.puts(" HERE IS EXAMPLE") |> IO.inspect
+    IO.puts("++++++++++++++++++++++++++++=")
+    assert false =="error" in result
+
+
+
   end
 
   test "request test", %{pid: pid} do
@@ -36,10 +58,10 @@ defmodule HTTP2Gun.ServerTest do
                       headers: [],
                       body: "",
                       opts: %{},
-                      port: 443} ==   HTTP2Gun.request(self(), :get, "http2://example.org:443/", "")
+                      port: 443} ==   HTTP2Gun.request(self(), :get, "http://example.org:443/", "")
       # convertation test
-      assert "GET" == HTTP2Gun.request(self(), :get, "http2://example.org:443/", "").method
-      assert "PUT" == HTTP2Gun.request(self(), :put, "http2://example.org:443/", "").method
+      assert "GET" == HTTP2Gun.request(self(), :get, "http://example.org:443/", "").method
+      assert "PUT" == HTTP2Gun.request(self(), :put, "http://example.org:443/", "").method
     end
   end
 
@@ -98,7 +120,7 @@ defmodule HTTP2Gun.ServerTest do
     assert {:ok, pid} = HTTP2Gun.PoolConn.start_link()
     #add stream to connection from state
     {:ok, state} = HTTP2Gun.PoolConn.init(1)
-    make_ref = self()
+    make_ref = {self(), :erlang.make_ref()}
     {key, {_streams, conn_name}} = state.conn
                                    |> Map.to_list()
                                    |> hd
@@ -145,6 +167,8 @@ defmodule HTTP2Gun.ServerTest do
     new_state = %{state | pools: state.pools
                             |> Map.put("example.com", {"example.com", '#PID<0.209.0>', 0})
                             |> Map.keys}
+
+
     {:noreply, res_state} = HTTP2Gun.PoolGroup.handle_call(%Request{host: "example.com",
                                                                           method: "GET",
                                                                           path: "/",
@@ -155,4 +179,5 @@ defmodule HTTP2Gun.ServerTest do
     assert new_state == %{state | pools: res_state.pools
                         |> Map.keys}
   end
+
 end

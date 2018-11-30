@@ -50,7 +50,9 @@ defmodule HTTP2Gun do
                              body: body,
                              opts: opts,
                              port: port}
-        GenServer.call(pid, request)
+
+          # IO.puts("()()()()()()()()()()()")
+          result = GenServer.call(pid, request) #|> IO.inspect
     true ->
         {:error, "Error URI"}
     end
@@ -61,7 +63,7 @@ defmodule HTTP2Gun do
   end
 
   def request_test(pid) do
-    request(pid, :get, "http://zeroloader.xyz:443/", "")
+    request(pid, :get, "http://duckduckgo.com:443/", "")
   end
 
   def request_test_new(pid) do

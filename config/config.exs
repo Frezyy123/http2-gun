@@ -2,8 +2,8 @@ use Mix.Config
 
 
 config :http2_gun,
-  default_hostname: "zeroloader.xyz",
+  default_hostname: "duckduckgo.com",
   default_port: 443,
-  max_requests: 100,
+  max_requests: 10,
   warming_up_count: 4,
-  max_connections: 100
+  max_connections: 10

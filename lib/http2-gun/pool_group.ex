@@ -47,6 +47,6 @@ defmodule HTTP2Gun.PoolGroup do
     update_map = Map.update!(state.pools, hostname,
                              fn {_host, _pid, _count} ->
                                {hostname, pool_pid, conns_count + 1} end)
-    {:noreply, %{state | pools: update_map}} |> IO.inspect
+    {:noreply, %{state | pools: update_map}}
   end
 end

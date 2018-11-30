@@ -92,8 +92,8 @@ defmodule HTTP2Gun.PoolConn do
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
             {conn_pid, new_state}
-          # else
-          #   {nil, state}
+          else
+            {nil, state}
           end
       end
 
@@ -107,6 +107,6 @@ defmodule HTTP2Gun.PoolConn do
           GenServer.reply(from, response) end)
     end
 
-    {:noreply,  new_state} |> IO.inspect
+    {:noreply,  new_state}
   end
 end

@@ -51,8 +51,13 @@ defmodule HTTP2Gun do
                              opts: opts,
                              port: port}
 
-          # IO.puts("()()()()()()()()()()()")
-          result = GenServer.call(pid, request) #|> IO.inspect
+
+
+          pid_src = self()
+          pid_src
+          ref = :erlang.make_ref()
+          from_src = {pid_src, ref}
+          result = GenServer.call(pid, {request, from_src})
     true ->
         {:error, "Error URI"}
     end

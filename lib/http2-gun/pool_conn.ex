@@ -3,6 +3,8 @@ defmodule HTTP2Gun.PoolConn do
 
   alias HTTP2Gun.ConnectionWorker, as: Worker
   alias HTTP2Gun.Response
+  alias HTTP2Gun.Error
+
   defstruct [
     :max_requests,
     :warming_up_count,
@@ -40,17 +42,12 @@ defmodule HTTP2Gun.PoolConn do
     {:noreply, next_conn}
   end
 
-  # def handle_info(msg, state) do
-  #   IO.puts("POOL")
-  #   msg |> IO.inspect
-  #   {:noreply, state}
-  # end
-
   defp open_conn(state, count, host, port) do
     pid_list = Enum.map(1..count,
                 fn name ->
-                  {:ok, conn_pid} = Worker.start_link(%{host: host, port: port,
-                                                        opts: [], pool_conn_pid: self()})
+                  {:ok, conn_pid} = DynamicSupervisor.start_child(HTTP2Gun.Connection,
+                  %{id: 5, start: {HTTP2Gun.ConnectionWorker, :start_link, [%{host: host, port: port,
+                                                          opts: [], pool_conn_pid: self()}]}})
                   {conn_pid, name} end)
     conn_map = Enum.map(pid_list,
                  fn {conn_pid, name} ->
@@ -62,26 +59,18 @@ defmodule HTTP2Gun.PoolConn do
     %{state | conn: conn_map}
   end
 
-
   def handle_cast({%Response{} = response, pid_src}, %__MODULE__{pool_group_pid: from_pid} = state) do
-    IO.puts "*************************************"
-   #IO.puts("POOLGROUP PID HANDLE CAST")
-    #from_pid |> IO.inspect
-
     GenServer.cast(from_pid, {response, pid_src})
-
     {:noreply, state}
   end
 
   def handle_cast(:timeout, %__MODULE__{pool_group_pid: from_pid} = state) do
-    GenServer.cast(from_pid, "Error")
+    GenServer.cast(from_pid, %Error{reason: "GUN DOWN",
+    source: __MODULE__})
     {:noreply, state}
   end
 
   def handle_cast({request, pid, pid_src}, state) do
-   # IO.puts("POOLGROUP PID HANDLE CALL")
-    #from |> IO.inspect
-   # pid |> IO.inspect
     IO.puts("---> Handle call POOL")
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
@@ -101,7 +90,7 @@ defmodule HTTP2Gun.PoolConn do
 
         true ->
           if (Enum.count(state.conn) < state.max_connections) do
-            #IO.puts("------> Start new CONNECTION")
+            IO.puts("------> Start new CONNECTION")
             GenServer.cast(pid, {self(),
                           Enum.count(state.conn), request.host})
             {_, {_, last_name}} = Enum.to_list(state.conn)
@@ -118,17 +107,14 @@ defmodule HTTP2Gun.PoolConn do
           end
       end
 
-    pid = self()
+    pid_self = self()
     case new_pid do
-      nil -> GenServer.cast(pid_src, "error")
+      nil -> GenServer.cast(pid, {%Error{reason: "GUN DOWN",
+      source: __MODULE__}, pid_src})
       _ ->
-        #IO.puts("NEW_PID (WORKER PID)")
-        #IO.inspect(new_pid)
         GenServer.cast(new_pid, {request, pid_src})
-        send(pid, {new_pid, :decrement})
-        #GenServer.reply(from, response)
+        send(pid_self, {new_pid, :decrement})
     end
-
-    {:noreply, new_state}
+    {:noreply, new_state} |> IO.inspect
   end
 end

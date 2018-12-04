@@ -2,6 +2,7 @@ defmodule HTTP2Gun.PoolGroup do
   use GenServer
   alias HTTP2Gun.PoolGroup
   alias HTTP2Gun.Response
+
   defstruct [
     :default_hostname,
     :interface_pid,
@@ -9,23 +10,20 @@ defmodule HTTP2Gun.PoolGroup do
 
   ]
   def start_link() do
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [])
+    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [], name: HTTP2Gun.PoolGroup)
     {:ok, pid}
   end
 
   def init(_) do
-    # default poolgroup
     default_hostname = Application.get_env(:http2_gun, :default_hostname)
-    IO.puts("POOLGROUP PID")
-    self()
-    {:ok, pid} = HTTP2Gun.PoolConn.start_link(self())
+    {:ok, pid} = DynamicSupervisor.start_child(HTTP2Gun.PoolConn,
+      %{id: 5, start: {HTTP2Gun.PoolConn, :start_link, [self()]}})
     init_map = Map.put(%{}, default_hostname,
                       {default_hostname, pid, 0})
     {:ok, %{%PoolGroup{} | pools: init_map, default_hostname: default_hostname}}
   end
 
   def create_pool(hostname, state) do
-    # registry
     {:ok, pid} = HTTP2Gun.PoolConn.start_link(self())
     update_map = Map.put(state.pools, hostname,
     {hostname, pid, 0})
@@ -33,8 +31,6 @@ defmodule HTTP2Gun.PoolGroup do
   end
 
   def handle_call({request, pid_src}, from, state) do
-    IO.puts("PID API  POOL GROUP")
-    from
     hostname = request.host
     {new_state, pool_pid} =
       case Map.fetch(state.pools, hostname) do
@@ -42,18 +38,17 @@ defmodule HTTP2Gun.PoolGroup do
           {state, pid}
           :error -> create_pool(hostname, state)
         end
-    pid = self()
-
-    GenServer.cast(pool_pid, {request, pid, from})
-
+    GenServer.cast(pool_pid, {request, self(), from})
     {:noreply, new_state}
   end
 
-
   def handle_cast({%Response{} = response, pid_src}, state) do
-    IO.puts("return interface pid")
-    pid_src
     GenServer.reply(pid_src, response)
+    {:noreply, state}
+  end
+
+  def handle_cast({error_reason, pid_src}, state) do
+    GenServer.reply(pid_src, error_reason)
     {:noreply, state}
   end
 

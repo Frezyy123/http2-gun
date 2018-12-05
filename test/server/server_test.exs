@@ -13,8 +13,8 @@ defmodule HTTP2Gun.ServerTest do
 
   test "restriction_test", %{pid: pid} do
     # more than 100 in connection
-    pids = Enum.map(1..2000, fn x -> pid end)
-    result = Enum.each(1..10, fn x ->
+    pids = Enum.map(1..100, fn x -> pid end)
+    result = Enum.each(1..50, fn x ->
                         pids
                         |> Enum.map(&(Task.async(fn ->  HTTP2Gun.request_test(&1)
                         HTTP2Gun.request_test_new(&1)

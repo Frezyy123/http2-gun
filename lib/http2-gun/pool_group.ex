@@ -2,6 +2,7 @@ defmodule HTTP2Gun.PoolGroup do
   use GenServer
   alias HTTP2Gun.PoolGroup
   alias HTTP2Gun.Response
+
   defstruct [
     :default_hostname,
     :interface_pid,
@@ -9,16 +10,15 @@ defmodule HTTP2Gun.PoolGroup do
 
   ]
   def start_link() do
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [])
+    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [], name: HTTP2Gun.PoolGroup)
     {:ok, pid}
   end
 
   def init(_) do
     # default poolgroup
     default_hostname = Application.get_env(:http2_gun, :default_hostname)
-    IO.puts("POOLGROUP PID")
-    self()
-    {:ok, pid} = HTTP2Gun.PoolConn.start_link(self())
+    IO.puts("POOLGROUP INIT")
+    {:ok, pid} = DynamicSupervisor.start_child(HTTP2Gun.PoolConnSup, {HTTP2Gun.PoolConn, self()})
     init_map = Map.put(%{}, default_hostname,
                       {default_hostname, pid, 0})
     {:ok, %{%PoolGroup{} | pools: init_map, default_hostname: default_hostname}}
@@ -26,7 +26,8 @@ defmodule HTTP2Gun.PoolGroup do
 
   def create_pool(hostname, state) do
     # registry
-    {:ok, pid} = HTTP2Gun.PoolConn.start_link(self())
+    {:ok, pid} = DynamicSupervisor.start_child(HTTP2Gun.PoolConnSup, {HTTP2Gun.PoolConn, self()})
+
     update_map = Map.put(state.pools, hostname,
     {hostname, pid, 0})
     {%{state | pools: update_map}, pid}
@@ -52,8 +53,15 @@ defmodule HTTP2Gun.PoolGroup do
 
   def handle_cast({%Response{} = response, pid_src}, state) do
     IO.puts("return interface pid")
-    pid_src
+
     GenServer.reply(pid_src, response)
+    {:noreply, state}
+  end
+
+  def handle_cast({error_reason, pid_src}, state) do
+    IO.puts("return interface pid")
+
+    GenServer.reply(pid_src, error_reason)
     {:noreply, state}
   end
 

@@ -3,7 +3,7 @@ defmodule HTTP2Gun.ConnectionWorker do
   alias HTTP2Gun.ConnectionWorker, as: Worker
   alias HTTP2Gun.Request
   alias HTTP2Gun.Response
-
+  alias HTTP2Gun.Error
   defstruct [
     :host,
     :port,
@@ -16,11 +16,14 @@ defmodule HTTP2Gun.ConnectionWorker do
   ]
 
   def start_link(state) do
+    IO.puts("Start link CONNECTION_WORKER")
+    state |> IO.inspect
     {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state)
     {:ok, pid}
   end
 
   def init(state) do
+    IO.puts("Init CONNECTION_WORKER")
     {:ok, pid} = :gun.open(String.to_charlist(state.host), state.port,
                            %{retry: 0, retry_timeout: 0})
     {:ok, %Worker{gun_pid: pid, host: state.host,
@@ -34,7 +37,6 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
-    data
     case state.streams |> Map.get(stream_ref)do
       nil ->
         {:noreply, state}
@@ -57,7 +59,6 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
     IO.puts("-------> Gun RESPONSE")
-    #{from, response, cancel_ref, timer_ref} = Map.get(state.streams, stream_ref)
     state_new = case state.streams |> Map.get(stream_ref) do
       nil ->
         {:noreply, state}
@@ -78,44 +79,49 @@ defmodule HTTP2Gun.ConnectionWorker do
     {:noreply, state_new}
   end
 
-  def handle_info({from, cancel_ref, :timeout},
-                  %Worker{gun_pid: gun_pid, cancels: cancels}=state) do
+  def handle_info({:timeout, from, cancel_ref},
+                  %Worker{gun_pid: gun_pid, streams: streams, cancels: cancels}=state) do
     IO.puts("-------> TIMEOUT")
     case cancels |> Map.get(cancel_ref) do
       nil ->
-        GenServer.cast(from, :timeout)
+        Enum.each(Map.values(streams), fn {_from, _response, _cancel_ref, _timer_ref, pid_src} -> GenServer.reply(pid_src, %Error{reason: "Timeout stream",
+                                                                                                                                  source: __MODULE__}) end)
         {:noreply, state}
       stream_ref ->
-        GenServer.cast(from, :timeout)
+        Enum.each(Map.values(streams), fn {_from, _response, _cancel_ref, _timer_ref, pid_src} -> GenServer.reply(pid_src,  %Error{reason: "Timeout stream",
+                                                                                                                                   source: __MODULE__}) end)
         :ok = :gun.close(gun_pid)
         {:noreply, clean_refs(state, stream_ref, cancel_ref)}
     end
   end
 
-  def handle_info({:gun_error, _, _, _}, state) do
+  def handle_info({:gun_error, coonPid, streamRef, reason}, %Worker{streams: streams, gun_pid: gun_pid}=state) do
     IO.puts("-------> Gun ERROR")
+    Enum.each(Map.values(streams), fn {_from, _response, _cancel_ref, _timer_ref, pid_src} -> GenServer.reply(pid_src, %Error{reason: "GUN ERROR",
+                                                                                                                              source: __MODULE__}) end)
+    {:noreply, state}
+  end
+
+  def handle_info({:gun_error, coonPid, reason}, %Worker{streams: streams, gun_pid: gun_pid}=state) do
+    IO.puts("-------> Gun ERROR without StreamRef")
+    Enum.each(Map.values(streams), fn {_from, _response, _cancel_ref, _timer_ref, pid_src} -> GenServer.reply(pid_src, %Error{reason: "GUN ERROR",
+                                                                                                                              source: __MODULE__}) end)
     {:noreply, state}
   end
 
   def handle_info({:gun_down, gun_pid, _protocol, reason, _killed_streams, unprocessed_streams},
   %Worker{streams: streams, gun_pid: gun_pid}=state) do
     IO.puts("-------> Gun DOWN")
-    streams =
-      streams
-      |> Map.drop(unprocessed_streams)
-    GenServer.stop(self(), :gundown)
-    {:noreply, %{state | streams: streams}}
+    Enum.each(Map.values(streams), fn {_from, _response, _cancel_ref, _timer_ref, pid_src} -> GenServer.reply(pid_src, %Error{reason: "GUN DOWN",
+                                                                                                                              source: __MODULE__}) end)
+    {:noreply, state}
   end
-  # def handle_info(msg, state) do
-  #   msg |> IO.inspect
-  #   {:noreply, state}
-  # end
 
   def handle_cast({%Request{method: method, path: path}, pid_src},
                     %Worker{streams: streams, cancels: cancels, pool_conn_pid: from_pid}=state) do
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()
-    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, 5000)
+    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, 500)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
                               String.to_charlist(path), [])
     IO.puts("REQUEST NOW")
@@ -134,16 +140,11 @@ defmodule HTTP2Gun.ConnectionWorker do
   def reply(stream_ref, _is_fin, from, response, cancel_ref, timer_ref, pid_src,
               %Worker{streams: _streams, cancels: _cancels}=state) do
     Process.cancel_timer(timer_ref)
-    #IO.puts("REPLY CAST POOLCONN")
-    #from |> IO.inspect
     GenServer.cast(from, {response, pid_src})
-
-
     clean_refs(state, stream_ref, cancel_ref)
   end
 
   defp clean_refs(%Worker{streams: streams, cancels: cancels} = state, stream_ref, cancel_ref) do
-
     %{state |
         streams: (
           streams |> Map.delete(stream_ref)
@@ -152,7 +153,6 @@ defmodule HTTP2Gun.ConnectionWorker do
           cancels |> Map.delete(cancel_ref)
         )
       }
-
   end
 
   def continue(stream_ref, _is_fin, from, response, cancel_ref, timer_ref, pid_src,
@@ -164,5 +164,4 @@ defmodule HTTP2Gun.ConnectionWorker do
       )
     }
   end
-
 end

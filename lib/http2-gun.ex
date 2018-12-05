@@ -9,23 +9,6 @@ defmodule HTTP2Gun do
     request("POST", url, body, headers, opts)
   end
 
-  def get!(url, headers \\ [], opts \\ %{}) do
-    request!("GET", url, "", headers, opts)
-  end
-
-  def post!(url, body, headers \\ [], opts \\ %{}) do
-    request!("POST", url, body, headers, opts)
-  end
-
-  """
-  :host,
-    :method,
-    :port,
-    :path,
-    :headers,
-    :body,
-    :opts
-  """
   def request(pid, method, url, body, headers \\ [], opts \\ %{}) do
     case URI.parse(url) do
       %URI{
@@ -50,21 +33,12 @@ defmodule HTTP2Gun do
                              body: body,
                              opts: opts,
                              port: port}
-
-
-
-          pid_src = self()
-          pid_src
           ref = :erlang.make_ref()
-          from_src = {pid_src, ref}
-          result = GenServer.call(pid, {request, from_src})
+          from_src = {self(), ref}
+          GenServer.call(pid, {request, from_src})
     true ->
         {:error, "Error URI"}
     end
-  end
-
-  def request!(pid, method, url, body, headers \\ [], opts \\ %{}) do
-    # GenServer.call(pid, request_test)
   end
 
   def request_test(pid) do

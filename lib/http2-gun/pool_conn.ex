@@ -16,8 +16,8 @@ defmodule HTTP2Gun.PoolConn do
 
   def start_link(pool_group_pid) do
     IO.puts("Start link pool_conn")
-    pool_group_pid |> IO.inspect
-    {:ok, pid} = GenServer.start_link(__MODULE__, pool_group_pid) |> IO.inspect
+
+    {:ok, pid} = GenServer.start_link(__MODULE__, pool_group_pid)
     {:ok, pid}
   end
 
@@ -40,7 +40,7 @@ defmodule HTTP2Gun.PoolConn do
     pool_group_pid, warming_up_count, max_connections}, state) do
     "Handle_info POOL_CONN" |> IO.inspect
     state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
-                      default_hostname, default_port) |> IO.inspect
+                      default_hostname, default_port)
     IO.puts("Start ConnectionWorker")
     {:noreply, %{state |
             max_requests: max_requests, warming_up_count: warming_up_count,
@@ -48,7 +48,7 @@ defmodule HTTP2Gun.PoolConn do
   end
 
   def handle_info({pid, :decrement}, state) do
-    IO.puts("---> Handle info DECREMENT")
+  # IO.puts("---> Handle info DECREMENT")
     next_conn = %{state | conn: state.conn
                   |> Map.update!(pid,
                     fn {x, name} ->
@@ -86,7 +86,7 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_cast({request, pid, pid_src}, state) do
     IO.puts("---> Handle call POOL")
-    state |> IO.inspect
+    # state |> IO.inspect
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
@@ -100,7 +100,7 @@ defmodule HTTP2Gun.PoolConn do
           new_state =  %{state | conn: state.conn
                          |> Map.update!(min_key,
                               fn {x, last_name} ->
-                                {x + 1, last_name} end)} |> IO.inspect
+                                {x + 1, last_name} end)}
           {min_key, new_state}
 
         true ->
@@ -112,11 +112,11 @@ defmodule HTTP2Gun.PoolConn do
                                   |> Enum.max_by(fn {_, {_, name}} ->
                                                   name end)
             {:ok, conn_pid} = DynamicSupervisor.start_child(String.to_atom(Kernel.inspect(self())), {HTTP2Gun.ConnectionWorker,
-            %{host: request.host, port: request.port, opts: [], pool_conn_pid: self()}}) |> IO.inspect
+            %{host: request.host, port: request.port, opts: [], pool_conn_pid: self()}})
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
                           "-----------------------------------------------------------" |> IO.inspect
-            {conn_pid, new_state} |> IO.inspect
+            {conn_pid, new_state}
           else
             {nil, state}
           end
@@ -124,12 +124,13 @@ defmodule HTTP2Gun.PoolConn do
 
     pid_self = self()
     case new_pid do
-      nil -> GenServer.cast(pid, {%Error{reason: "GUN DOWN",
-      source: __MODULE__}, pid_src})
+      nil -> GenServer.reply(pid_src, {%Error{reason: "LIMIT OF CONNECTION",
+      source: __MODULE__}})
+      IO.puts("LIMIT OF CONNECTION")
       _ ->
         GenServer.cast(new_pid, {request, pid_src})
         send(pid_self, {new_pid, :decrement})
     end
-    {:noreply, new_state} |> IO.inspect
+    {:noreply, new_state}
   end
 end

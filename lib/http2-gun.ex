@@ -33,20 +33,19 @@ defmodule HTTP2Gun do
                              body: body,
                              opts: opts,
                              port: port}
-          ref = :erlang.make_ref()
-          from_src = {self(), ref}
-          result = GenServer.call(pid, {request, from_src})
-          # case result do
-          #   %Error{} -> result
-          #   _ -> :ok
-          # end
+
+          result = GenServer.call(pid, request)
+          case result do
+            %Error{} -> :error
+            _ -> :ok
+          end
     true ->
         {:error, "Error URI"}
     end
   end
 
   def request_test(pid) do
-    request(pid, :get, "http://duckduckgo.com:443/", "")
+    request(pid, :get, "http://eporner.com:443/", "")
   end
 
   def request_test_new(pid) do

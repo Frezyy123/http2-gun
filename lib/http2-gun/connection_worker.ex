@@ -15,9 +15,9 @@ defmodule HTTP2Gun.ConnectionWorker do
     cancels: %{}
   ]
 
+  @spec start_link(any()) :: {:ok, pid()}
   def start_link(state) do
     IO.puts("Start link CONNECTION_WORKER")
-    state |> IO.inspect
     {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state)
     {:ok, pid}
   end
@@ -37,12 +37,11 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
-    case state.streams |> Map.get(stream_ref)do
+    state_new = case state.streams |> Map.get(stream_ref)do
       nil ->
         {:noreply, state}
       {from, response, cancel_ref, timer_ref, pid_src} ->
         response = %Response{response | body: data}
-        state_new =
           case is_fin do
             :nofin -> continue(stream_ref, is_fin,
                         from, response,
@@ -53,13 +52,15 @@ defmodule HTTP2Gun.ConnectionWorker do
                         cancel_ref, timer_ref, pid_src,
                         state)
           end
-        {:noreply, state_new}
+
     end
+    {:noreply, state_new}
+
   end
 
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
     IO.puts("-------> Gun RESPONSE")
-    state_new = case state.streams |>IO.inspect |> Map.get(stream_ref) do
+    state_new = case state.streams |> Map.get(stream_ref) do
       nil ->
         {:noreply, state}
       {from, response, cancel_ref, timer_ref, pid_src} ->

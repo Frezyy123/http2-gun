@@ -1,6 +1,6 @@
 defmodule HTTP2Gun do
   alias HTTP2Gun.Request
-
+  alias HTTP2Gun.Error
   def get(url, headers \\ [], opts \\ %{}) do
     request("GET", url, "", headers, opts)
   end
@@ -35,7 +35,11 @@ defmodule HTTP2Gun do
                              port: port}
           ref = :erlang.make_ref()
           from_src = {self(), ref}
-          GenServer.call(pid, {request, from_src})
+          result = GenServer.call(pid, {request, from_src})
+          # case result do
+          #   %Error{} -> result
+          #   _ -> :ok
+          # end
     true ->
         {:error, "Error URI"}
     end

@@ -40,7 +40,7 @@ defmodule HTTP2Gun.PoolConn do
     pool_group_pid, warming_up_count, max_connections}, state) do
     "Handle_info POOL_CONN" |> IO.inspect
     state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
-                      default_hostname, default_port)
+                      default_hostname, default_port) |> IO.inspect
     IO.puts("Start ConnectionWorker")
     {:noreply, %{state |
             max_requests: max_requests, warming_up_count: warming_up_count,
@@ -61,7 +61,7 @@ defmodule HTTP2Gun.PoolConn do
     pid_list = Enum.map(1..count,
                 fn name ->
                   {:ok, conn_pid} = DynamicSupervisor.start_child(String.to_atom(Kernel.inspect(self())), {HTTP2Gun.ConnectionWorker,
-                    %{host: host, port: port, opts: [], pool_conn_pid: self()}}) |> IO.inspect
+                    %{host: host, port: port, opts: [], pool_conn_pid: self()}})
                   {conn_pid, name} end)
     conn_map = Enum.map(pid_list,
                  fn {conn_pid, name} ->
@@ -86,6 +86,7 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_cast({request, pid, pid_src}, state) do
     IO.puts("---> Handle call POOL")
+    state |> IO.inspect
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
@@ -99,7 +100,7 @@ defmodule HTTP2Gun.PoolConn do
           new_state =  %{state | conn: state.conn
                          |> Map.update!(min_key,
                               fn {x, last_name} ->
-                                {x + 1, last_name} end)}
+                                {x + 1, last_name} end)} |> IO.inspect
           {min_key, new_state}
 
         true ->
@@ -110,12 +111,12 @@ defmodule HTTP2Gun.PoolConn do
             {_, {_, last_name}} = Enum.to_list(state.conn)
                                   |> Enum.max_by(fn {_, {_, name}} ->
                                                   name end)
-            {:ok, conn_pid} = Worker.start_link(%{host: request.host,
-                                                  port: request.port, opts: [], pool_conn_pid: self()}
-                                                  )
+            {:ok, conn_pid} = DynamicSupervisor.start_child(String.to_atom(Kernel.inspect(self())), {HTTP2Gun.ConnectionWorker,
+            %{host: request.host, port: request.port, opts: [], pool_conn_pid: self()}}) |> IO.inspect
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
-            {conn_pid, new_state}
+                          "-----------------------------------------------------------" |> IO.inspect
+            {conn_pid, new_state} |> IO.inspect
           else
             {nil, state}
           end

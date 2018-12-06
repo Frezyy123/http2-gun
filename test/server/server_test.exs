@@ -11,19 +11,19 @@ defmodule HTTP2Gun.ServerTest do
     %{pid: pid}
   end
 
-  test "restriction_test", %{pid: pid} do
-    # more than 100 in connection
-    pids = Enum.map(1..100, fn x -> pid end)
-    result = Enum.each(1..50, fn x ->
-                        pids
-                        |> Enum.map(&(Task.async(fn ->  HTTP2Gun.request_test(&1)
-                        HTTP2Gun.request_test_new(&1)
-                          end)))
-                        |> Enum.map(fn x ->Task.await(x) end)
-                          end)
-  end
+  # test "restriction_test", %{pid: pid} do
+  #   # more than 100 in connection
+  #   pids = Enum.map(1..50, fn x -> pid end)
+  #   result = Enum.reduce(1..2, [], fn x, acc ->
+  #                       pids
+  #                       |> Enum.map(&(Task.async(fn -> acc ++ HTTP2Gun.request_test(&1)
 
-  test "Request interface" do
+  #                         end)))
+  #                       |> Enum.map(fn x ->Task.await(x) end)
+  #                         end) |> IO.inspect(limit: 1000)
+  # end
+
+  test "Request interface", %{pid: pid} do
     # forming request test
     with_mock GenServer, [call: fn(_,request)-> request end] do
       assert {%Request{host: "example.org",
@@ -32,11 +32,11 @@ defmodule HTTP2Gun.ServerTest do
                       headers: [],
                       body: "",
                       opts: %{},
-                      port: 443},_} =   HTTP2Gun.request(self(), :get, "http://example.org:443/", "")
+                      port: 443},_} =   HTTP2Gun.request(pid, :get, "http://example.org:443/", "")
       # convertation test
-      {%Request{method: method_get}, _} = HTTP2Gun.request(self(), :get, "http://example.org:443/", "")
+      {%Request{method: method_get}, _} = HTTP2Gun.request(pid, :get, "http://example.org:443/", "")
       assert "GET" == method_get
-      {%Request{method: method_put}, _} = HTTP2Gun.request(self(), :put, "http://example.org:443/", "")
+      {%Request{method: method_put}, _} = HTTP2Gun.request(pid, :put, "http://example.org:443/", "")
       assert "PUT" == method_put
     end
   end
@@ -53,7 +53,7 @@ defmodule HTTP2Gun.ServerTest do
       from = {ref, self()}
       # streams and cancels not empty
       {:noreply, %Worker{streams: streams, cancels: cancels}} =
-                                              Worker.handle_cast({%Request{method: "GET", path: "/"}, pid}, state)
+                                              Worker.handle_cast({%Request{method: "GET", path: "/"}, {pid, :erlang.make_ref()}}, state)
       assert not (Enum.empty?(streams) and Enum.empty?(cancels))
       # need to rewrite
       with_mock GenServer, [reply: fn(_,_) -> :ok end] do
@@ -67,19 +67,19 @@ defmodule HTTP2Gun.ServerTest do
         with_mock Map, [get: fn(_,_) -> {{ref, self()}, %Response{}, ref, ref} end] do
 
 
-          # header check, should return response in streams
-          # headers = ["header:values"]
-          # assert {:noreply, response_state} = Worker.handle_info({:gun_response, self(), ref,
-          #   :nofin, 200, headers}, init_state |> IO.inspect)
-          # {_,response, _, _} = response_state.streams |> Map.values |> hd
-          # assert response.headers == headers
-          # assert response.status_code == 200
+          #header check, should return response in streams
+          headers = ["header:values"]
+          assert {:noreply, response_state} = Worker.handle_info({:gun_response, self(), ref,
+            :nofin, 200, headers}, init_state |> IO.inspect)
+          {_,response, _, _} = response_state.streams |> Map.values |> hd
+          assert response.headers == headers
+          assert response.status_code == 200
 
 
-          # data = "hereisdata"
-          # assert {:noreply, data_state} = Worker.handle_info({:gun_data, self(), ref, :nofin, data}, state)
-          # {_,response, _, _} = data_state.streams |> Map.values |> hd
-          # assert response.body == data
+          data = "hereisdata"
+          assert {:noreply, data_state} = Worker.handle_info({:gun_data, self(), ref, :nofin, data}, state)
+          {_,response, _, _} = data_state.streams |> Map.values |> hd
+          assert response.body == data
 
         end
 
@@ -91,17 +91,31 @@ defmodule HTTP2Gun.ServerTest do
   end
 
 
-  test "PoolConn handle_cast() test" do
+  test "PoolConn handle_cast() test", %{pid: pid} do
     #start_link PoolCoon
-    assert {:ok, pid} = HTTP2Gun.PoolConn.start_link(self())
+
+
+    assert {:ok, pid} = HTTP2Gun.PoolConn.start_link(1)
     #add stream to connection from state
-    {:ok, state} = HTTP2Gun.PoolConn.init(1)
+    state = %HTTP2Gun.PoolConn{
+                              conn: %{
+                                self() => {1, 1},
+                                self() => {0, 2},
+                                self() => {0, 3},
+                                self() => {0, 4}
+                              },
+                              max_connections: 50,
+                              max_requests: 50,
+                              pool_group_pid: pid,
+                              warming_up_count: 4
+                            }
     make_ref = {self(), :erlang.make_ref()}
+    IO.puts("================================")
     {key, {_streams, conn_name}} = state.conn
-                                   |> Map.to_list()
-                                   |> hd
+                                    |> Map.to_list() |> IO.inspect
+                                    |> hd
     update_state = state.conn
-                   |> Map.update!(key, fn current_value ->
+                    |> Map.update!(key, fn current_value ->
                                         {1, conn_name} end)
     new_state = %{state | conn: update_state}
     assert {:noreply, new_state} == HTTP2Gun.PoolConn.handle_cast({%Request{host: "example.com",
@@ -114,24 +128,28 @@ defmodule HTTP2Gun.ServerTest do
     #add new connection, when all connection is filled
     update_state = %{state | conn: state.conn
                       |> Enum.map(fn {key, {streams, conn_name}} ->
-                                    {key, {100, conn_name}} end)
+                                    {key, {50, conn_name}} end)
                       |> Enum.into(%{})}
 
     test_state = %{state | conn: update_state.conn
-                                |> Map.put('#PID<0.209.0>', {0, conn_name + 1})
-                                |> Map.keys
-                                |> Enum.count}
+                                |> Map.put(:c.pid(0,209,0), {1, conn_name + 1})
+                      }
 
-    {:noreply, res_state} = HTTP2Gun.PoolConn.handle_cast({%Request{host: "example.com",
+    with_mock DynamicSupervisor, [start_child: fn _x, _y -> {:ok, :c.pid(0,209,0)} end] do
+
+
+          {:noreply, res_state} = HTTP2Gun.PoolConn.handle_cast({%Request{host: "example.com",
                                                                     method: "GET",
                                                                     path: "/",
                                                                     headers: [],
                                                                     body: "",
                                                                     opts: %{}},
                                                             self(), pid}, update_state)
-    assert test_state == %{state | conn: res_state.conn
-                                  |> Map.keys
-                                  |> Enum.count}
+        assert test_state == %{state | conn: res_state.conn}
+    end
+
+
+
   end
 
   test "PoolGroup handle_cast() test", %{pid: pid} do

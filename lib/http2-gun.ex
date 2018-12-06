@@ -35,10 +35,6 @@ defmodule HTTP2Gun do
                              port: port}
 
           result = GenServer.call(pid, request)
-          case result do
-            %Error{} -> :error
-            _ -> :ok
-          end
     true ->
         {:error, "Error URI"}
     end

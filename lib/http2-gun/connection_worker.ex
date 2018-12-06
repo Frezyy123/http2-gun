@@ -1,9 +1,11 @@
 defmodule HTTP2Gun.ConnectionWorker do
   use GenServer
+
   alias HTTP2Gun.ConnectionWorker, as: Worker
   alias HTTP2Gun.Request
   alias HTTP2Gun.Response
   alias HTTP2Gun.Error
+
   defstruct [
     :host,
     :port,
@@ -37,6 +39,7 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
+    {:gun_data, conn_pid, stream_ref, is_fin, data, [state]} |> IO.inspect
     state_new = case state.streams |> Map.get(stream_ref)do
       nil ->
         {:noreply, state}
@@ -120,9 +123,10 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_cast({%Request{method: method, path: path}, pid_src},
                     %Worker{streams: streams, cancels: cancels, pool_conn_pid: from_pid}=state) do
+    timeout = Application.get_env(:http2_gun, :time_for_timeout)
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()
-    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, 500)
+    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, timeout)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
                               String.to_charlist(path), [])
     IO.puts("REQUEST NOW")

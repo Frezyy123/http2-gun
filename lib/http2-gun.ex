@@ -34,7 +34,7 @@ defmodule HTTP2Gun do
                              opts: opts,
                              port: port}
           IO.puts("path #{path}")
-          GenServer.call(PoolGroup, request)
+          GenServer.call(HTTP2Gun.PoolGroup, request)
     _ ->
         {:error, "Error URI"}
     end

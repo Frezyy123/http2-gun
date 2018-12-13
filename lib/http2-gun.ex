@@ -1,6 +1,6 @@
 defmodule HTTP2Gun do
   alias HTTP2Gun.Request
-
+  alias HTTP2Gun.Error
   def get(url, headers \\ [], opts \\ %{}) do
     request("GET", url, "", headers, opts)
   end
@@ -9,7 +9,7 @@ defmodule HTTP2Gun do
     request("POST", url, body, headers, opts)
   end
 
-  def request(pid, method, url, body, headers \\ [], opts \\ %{}) do
+  def request(method, url, body, headers \\ [], opts \\ %{}) do
     case URI.parse(url) do
       %URI{
         scheme: scheme,
@@ -33,19 +33,18 @@ defmodule HTTP2Gun do
                              body: body,
                              opts: opts,
                              port: port}
-          ref = :erlang.make_ref()
-          from_src = {self(), ref}
-          GenServer.call(pid, {request, from_src})
-    true ->
+          IO.puts("path #{path}")
+          GenServer.call(PoolGroup, request)
+    _ ->
         {:error, "Error URI"}
     end
   end
 
   def request_test(pid) do
-    request(pid, :get, "http://duckduckgo.com:443/", "")
+    request(:post, "http://localhost:8082/api/log/", "")
   end
 
   def request_test_new(pid) do
-    request(pid, :get, "http://en.wikipedia.org:443/", "")
+    request(:post, "http://en.wikipedia.org:443/", "")
   end
 end

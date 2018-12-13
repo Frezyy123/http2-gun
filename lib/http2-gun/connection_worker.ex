@@ -1,9 +1,11 @@
 defmodule HTTP2Gun.ConnectionWorker do
   use GenServer
+
   alias HTTP2Gun.ConnectionWorker, as: Worker
   alias HTTP2Gun.Request
   alias HTTP2Gun.Response
   alias HTTP2Gun.Error
+
   defstruct [
     :host,
     :port,
@@ -15,9 +17,9 @@ defmodule HTTP2Gun.ConnectionWorker do
     cancels: %{}
   ]
 
+  @spec start_link(any()) :: {:ok, pid()}
   def start_link(state) do
     IO.puts("Start link CONNECTION_WORKER")
-    state |> IO.inspect
     {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state)
     {:ok, pid}
   end
@@ -37,12 +39,12 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
     IO.puts("-------> Gun DATA")
-    case state.streams |> Map.get(stream_ref)do
+    {:gun_data, conn_pid, stream_ref, is_fin, data, [state]} |> IO.inspect
+    state_new = case state.streams |> Map.get(stream_ref)do
       nil ->
         {:noreply, state}
       {from, response, cancel_ref, timer_ref, pid_src} ->
         response = %Response{response | body: data}
-        state_new =
           case is_fin do
             :nofin -> continue(stream_ref, is_fin,
                         from, response,
@@ -53,8 +55,10 @@ defmodule HTTP2Gun.ConnectionWorker do
                         cancel_ref, timer_ref, pid_src,
                         state)
           end
-        {:noreply, state_new}
+
     end
+    {:noreply, state_new}
+
   end
 
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
@@ -119,12 +123,12 @@ defmodule HTTP2Gun.ConnectionWorker do
 
   def handle_cast({%Request{method: method, path: path}, pid_src},
                     %Worker{streams: streams, cancels: cancels, pool_conn_pid: from_pid}=state) do
+    timeout = Application.get_env(:http2_gun, :time_for_timeout)
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()
-    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, 500)
+    timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, timeout)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
                               String.to_charlist(path), [])
-    IO.puts("REQUEST NOW")
     {:noreply, %{state |
       streams: (
         streams |> Map.put(stream_ref, {from_pid, %Response{},

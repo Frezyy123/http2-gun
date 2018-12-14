@@ -1,6 +1,6 @@
 defmodule HTTP2Gun do
   alias HTTP2Gun.Request
-  alias HTTP2Gun.Error
+
   def get(url, headers \\ [], opts \\ %{}) do
     request("GET", url, "", headers, opts)
   end
@@ -9,14 +9,14 @@ defmodule HTTP2Gun do
     request("POST", url, body, headers, opts)
   end
 
-  def request(pid, method, url, body, headers \\ [], opts \\ %{}) do
+  def request(method, url, body, headers \\ [], opts \\ %{}) do
     case URI.parse(url) do
       %URI{
-        scheme: scheme,
+        scheme: _scheme,
         host: host,
         path: path,
         port: port,
-        query: query}  when is_binary(host)
+        query: _query}  when is_binary(host)
         and is_integer(port) ->
           method =
             case method do
@@ -34,17 +34,17 @@ defmodule HTTP2Gun do
                              opts: opts,
                              port: port}
 
-          result = GenServer.call(pid, request)
-    true ->
+          GenServer.call(HTTP2Gun.PoolGroup, request)
+    _ ->
         {:error, "Error URI"}
     end
   end
 
   def request_test(pid) do
-    request(pid, :get, "http://eporner.com:443/", "")
+    request(:get, "http://eporner.com:443/", "", [{"content-type", "text/html; charset=UTF-8"}])
   end
 
   def request_test_new(pid) do
-    request(pid, :get, "http://en.wikipedia.org:443/", "")
+    request(:get, "http://en.wikipedia.org:443/", "")
   end
 end

@@ -18,6 +18,7 @@ defmodule HTTP2Gun.ConnectionWorker do
     cancels: %{}
   ]
 
+  @spec start_link(any()) :: {:ok, pid()}
   def start_link(state) do
     {:ok, pid} = GenServer.start_link(HTTP2Gun.ConnectionWorker, state)
     Logger.info("start connection worker #{Kernel.inspect(pid)}")
@@ -127,6 +128,7 @@ defmodule HTTP2Gun.ConnectionWorker do
     timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, timeout)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
                               String.to_charlist(path), headers, String.to_charlist(body))
+                              
     {:noreply, %{state |
       streams: (
         streams |> Map.put(stream_ref, {from_pid, %Response{},

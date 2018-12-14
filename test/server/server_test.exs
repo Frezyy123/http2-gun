@@ -90,7 +90,6 @@ defmodule HTTP2Gun.ServerTest do
 
   end
 
-
   test "pool_conn handle_cast() test", %{pid: pid} do
     #start_link PoolCoon
 
@@ -110,6 +109,7 @@ defmodule HTTP2Gun.ServerTest do
                               warming_up_count: 4
                             }
     make_ref = {self(), :erlang.make_ref()}
+    IO.puts("================================")
     {key, {_streams, conn_name}} = state.conn
                                     |> Map.to_list()
                                     |> hd

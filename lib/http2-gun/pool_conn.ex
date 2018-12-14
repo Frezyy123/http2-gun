@@ -112,6 +112,7 @@ defmodule HTTP2Gun.PoolConn do
             %{host: request.host, port: request.port, opts: [], pool_conn_pid: self()}})
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
+                          "-----------------------------------------------------------" |> IO.inspect
             {conn_pid, new_state}
           else
             {nil, state}

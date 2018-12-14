@@ -1,6 +1,6 @@
 defmodule HTTP2Gun do
   alias HTTP2Gun.Request
-
+  alias HTTP2Gun.Error
   def get(url, headers \\ [], opts \\ %{}) do
     request("GET", url, "", headers, opts)
   end

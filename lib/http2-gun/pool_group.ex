@@ -10,7 +10,7 @@ defmodule HTTP2Gun.PoolGroup do
 
   ]
   def start_link() do
-    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [], name: PoolGroup)
+    {:ok, pid} = GenServer.start_link(HTTP2Gun.PoolGroup, [], name: HTTP2Gun.PoolGroup)
     {:ok, pid}
   end
 

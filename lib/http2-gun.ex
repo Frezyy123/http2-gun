@@ -33,7 +33,7 @@ defmodule HTTP2Gun do
                              body: body,
                              opts: opts,
                              port: port}
-          IO.puts("path #{path}")
+
           GenServer.call(HTTP2Gun.PoolGroup, request)
     _ ->
         {:error, "Error URI"}
@@ -41,10 +41,10 @@ defmodule HTTP2Gun do
   end
 
   def request_test(pid) do
-    request(:post, "http://localhost:8082/api/log/", "")
+    request(:get, "http://eporner.com:443/", "", [{"content-type", "text/html; charset=UTF-8"}]) |> IO.inspect
   end
 
   def request_test_new(pid) do
-    request(:post, "http://en.wikipedia.org:443/", "")
+    request(:get, "http://en.wikipedia.org:443/", "")
   end
 end

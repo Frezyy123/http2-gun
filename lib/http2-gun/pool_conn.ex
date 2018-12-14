@@ -38,6 +38,7 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_info({:start_child, max_requests, default_hostname, default_port,
     pool_group_pid, warming_up_count, max_connections}, state) do
+    "Handle_info POOL_CONN" |> IO.inspect
     state = open_conn(%__MODULE__{conn: %{}}, warming_up_count,
                       default_hostname, default_port)
     IO.puts("Start ConnectionWorker")
@@ -85,7 +86,7 @@ defmodule HTTP2Gun.PoolConn do
 
   def handle_cast({request, pid, pid_src}, state) do
     IO.puts("---> Handle call POOL")
-      state |> IO.inspect
+    # state |> IO.inspect
       {min_key, {min_value, _}} = Enum.to_list(state.conn)
                                     |> Enum.min_by(fn {_, {value, _}} ->
                                                      value end)
@@ -114,6 +115,7 @@ defmodule HTTP2Gun.PoolConn do
             %{host: request.host, port: request.port, opts: [], pool_conn_pid: self()}})
             new_state = %{state | conn: state.conn
                           |> Map.put(conn_pid, {1, last_name + 1})}
+                          "-----------------------------------------------------------" |> IO.inspect
             {conn_pid, new_state}
           else
             {nil, state}

@@ -121,14 +121,15 @@ defmodule HTTP2Gun.ConnectionWorker do
     {:noreply, state}
   end
 
-  def handle_cast({%Request{method: method, path: path}, pid_src},
+  def handle_cast({%Request{method: method, path: path, body: body, headers: headers}, pid_src},
                     %Worker{streams: streams, cancels: cancels, pool_conn_pid: from_pid}=state) do
     timeout = Application.get_env(:http2_gun, :time_for_timeout)
     IO.puts("---------> Connection worker REQUEST")
     cancel_ref = :erlang.make_ref()
     timer_ref = Process.send_after(self(), {:timeout, pid_src, cancel_ref}, timeout)
     stream_ref = :gun.request(state.gun_pid, String.to_charlist(method),
-                              String.to_charlist(path), [])
+                              String.to_charlist(path), headers, String.to_charlist(body))
+    IO.puts("REQUEST NOW")
     {:noreply, %{state |
       streams: (
         streams |> Map.put(stream_ref, {from_pid, %Response{},

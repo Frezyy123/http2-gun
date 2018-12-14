@@ -9,8 +9,10 @@ defmodule HTTP2Gun.ConnWorkerSup do
     }
   end
 
-  def start_link(name_pid) do
-    {:ok, pid} = DynamicSupervisor.start_link(__MODULE__, :ok, name: name_pid)
+  def start_link(parent_pid) do
+    {:ok, pid} = DynamicSupervisor.start_link(__MODULE__, [])
+    send(parent_pid, {:supervisor, pid})
+
     {:ok, pid}
   end
 

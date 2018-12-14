@@ -1,5 +1,6 @@
 defmodule HTTP2Gun.PoolConnSup do
   use DynamicSupervisor
+  require Logger
 
   def child_spec(opts) do
     %{
@@ -10,8 +11,7 @@ defmodule HTTP2Gun.PoolConnSup do
   end
 
   def start_link() do
-    {:ok, pid} = DynamicSupervisor.start_link(__MODULE__, [], name: __MODULE__)
-    {:ok, pid}
+    DynamicSupervisor.start_link(__MODULE__, [], name: __MODULE__)
   end
 
   def init(_) do

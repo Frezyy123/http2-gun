@@ -1,6 +1,6 @@
 defmodule HTTP2Gun do
   alias HTTP2Gun.Request
-  alias HTTP2Gun.Error
+
   def get(url, headers \\ [], opts \\ %{}) do
     request("GET", url, "", headers, opts)
   end
@@ -38,13 +38,5 @@ defmodule HTTP2Gun do
     _ ->
         {:error, "Error URI"}
     end
-  end
-
-  def request_test(pid) do
-    request(:get, "http://eporner.com:443/", "", [{"content-type", "text/html; charset=UTF-8"}])
-  end
-
-  def request_test_new(pid) do
-    request(:get, "http://en.wikipedia.org:443/", "")
   end
 end

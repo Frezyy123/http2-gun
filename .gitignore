@@ -7,3 +7,5 @@
 .elixir_ls/*
 .vscode/*
 .vs_code/*
+*.sh
+*.dump

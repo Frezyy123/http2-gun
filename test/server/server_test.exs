@@ -24,7 +24,7 @@ defmodule HTTP2Gun.ServerTest do
 
   end
 
-  test "Request interface", %{pid: pid} do
+  test "request interface", %{pid: pid} do
     # forming request test
     with_mock GenServer, [call: fn(_, request)-> request end] do
       assert %Request{host: "example.org",
@@ -42,7 +42,7 @@ defmodule HTTP2Gun.ServerTest do
     end
   end
 
-  test "ConnectionWorkerTest", %{pid: pid} do
+  test "connection worker test", %{pid: pid} do
       assert {:ok, _pid} = HTTP2Gun.ConnectionWorker.start_link(%Worker{pool_conn_pid: self(), host: "example.org", port: 443, opts: []})
 
       ref = :erlang.make_ref()
@@ -90,8 +90,7 @@ defmodule HTTP2Gun.ServerTest do
 
   end
 
-
-  test "PoolConn handle_cast() test", %{pid: pid} do
+  test "pool_conn handle_cast() test", %{pid: pid} do
     #start_link PoolCoon
 
 
@@ -112,7 +111,7 @@ defmodule HTTP2Gun.ServerTest do
     make_ref = {self(), :erlang.make_ref()}
     IO.puts("================================")
     {key, {_streams, conn_name}} = state.conn
-                                    |> Map.to_list() |> IO.inspect
+                                    |> Map.to_list()
                                     |> hd
     update_state = state.conn
                     |> Map.update!(key, fn current_value ->
@@ -152,7 +151,7 @@ defmodule HTTP2Gun.ServerTest do
 
   end
 
-  test "PoolGroup handle_cast() test", %{pid: pid} do
+  test "pool_group handle_cast() test", %{pid: pid} do
     #add new pool to pools from state
     {:ok, state} = HTTP2Gun.PoolGroup.init(1)
     make_ref = self()

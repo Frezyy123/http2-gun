@@ -12,11 +12,11 @@ defmodule HTTP2Gun do
   def request(method, url, body, headers \\ [], opts \\ %{}) do
     case URI.parse(url) do
       %URI{
-        scheme: scheme,
+        scheme: _scheme,
         host: host,
         path: path,
         port: port,
-        query: query}  when is_binary(host)
+        query: _query}  when is_binary(host)
         and is_integer(port) ->
           method =
             case method do
@@ -41,7 +41,7 @@ defmodule HTTP2Gun do
   end
 
   def request_test(pid) do
-    request(:get, "http://eporner.com:443/", "", [{"content-type", "text/html; charset=UTF-8"}]) |> IO.inspect
+    request(:get, "http://eporner.com:443/", "", [{"content-type", "text/html; charset=UTF-8"}])
   end
 
   def request_test_new(pid) do
